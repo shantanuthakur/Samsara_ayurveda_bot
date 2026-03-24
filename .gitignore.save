@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+.env/
+
+# Large files
+*.pt
+*.pth
+*.bin
+*.model
+*.ckpt
+*.zip
+*.tar.gz
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+..
+
+
