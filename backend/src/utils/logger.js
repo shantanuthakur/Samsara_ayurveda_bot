@@ -9,8 +9,7 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'rag-chatbot' },
   transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error', maxsize: 5242880, maxFiles: 5 }),
-    new winston.transports.File({ filename: 'logs/combined.log', maxsize: 5242880, maxFiles: 5 }),
+    new winston.transports.File({ filename: 'backend.log', maxsize: 5242880, maxFiles: 5 }),
   ],
 });
 
