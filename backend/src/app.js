@@ -20,16 +20,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ── Body parsing ──
 app.use(express.json({ limit: '1mb' }));
 
-// ── Compression ──
-app.use(compression());
-
-// ── Rate limiting ──
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute per IP
+  windowMs: 1 * 60 * 1000, 
+  max: 30, 
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again in a moment.' },

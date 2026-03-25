@@ -43,6 +43,20 @@ function App() {
   }, [profile.height, profile.weight]);
 
   useEffect(() => {
+    setMessages((prev) => {
+      const newMessages = [...prev];
+      if (newMessages.length > 0 && newMessages[0].role === "bot") {
+        const greetingName = profile.name ? ` ${profile.name}` : "";
+        newMessages[0] = {
+          ...newMessages[0],
+          content: `Namaste 🙏 I am your Ayurveda assistant. Please share your concern.`
+        };
+      }
+      return newMessages;
+    });
+  }, [profile.name]);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -79,7 +93,7 @@ function App() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         setMessages(prev => {
           const newMessages = [...prev];
