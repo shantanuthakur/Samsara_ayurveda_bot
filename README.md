@@ -92,6 +92,33 @@ docker run -d -p 6333:6333 -p 6334:6334 \
    pm2 save
    ```
 
+### Database environment variables (Qdrant credentials)
+
+Use environment variables to configure Qdrant for local, on-prem, or cloud deployment.
+
+Local Qdrant (development):
+```env
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=ayurveda_core_data,ayurveda_books
+SIMILARITY_THRESHOLD=0.35
+```
+
+Qdrant Cloud or remote service (production):
+```env
+QDRANT_URL=https://<your-cluster>.qdrant.cloud:6333
+QDRANT_API_KEY=<qdrant_api_key>
+QDRANT_COLLECTION=ayurveda_core_data,ayurveda_books
+SIMILARITY_THRESHOLD=0.35
+```
+
+In `backend/src/services/qdrantService.js`, ensure the client is built with the API key when provided:
+```js
+client = new QdrantClient({
+    url,
+    apiKey: process.env.QDRANT_API_KEY,
+});
+```
+
 ### Step 3: Build the Frontend
 1. Navigate to the frontend directory: `cd frontend`
 2. Update the `VITE_API_URL` inside your `.env` to point to the live domain API:
