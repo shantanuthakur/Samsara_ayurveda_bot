@@ -41,9 +41,10 @@ export async function getEmbedding(text) {
  * @param {string} query - User's question
  * @param {object} profile - Patient profile (name, age, dosha, bmi, etc.)
  * @param {boolean} isFirstMessage - Flag to trigger the initial greeting
+ * @param {array} history - Array of previous chat messages
  * @returns {object} Stream object
  */
-export async function generateAnswer(context, query, profile = {}, isFirstMessage = false) {
+export async function generateAnswer(context, query, profile = {}, isFirstMessage = false, history = []) {
   const model = process.env.CHAT_MODEL || 'gpt-4o-mini';
   const client = getClient();
 
@@ -63,37 +64,45 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
     ? `\n\nPatient Profile:\n${profileParts.join('\n')}`
     : '';
 
-  // Dynamically set the greeting rule based on whether it is the first message
-  const greetingRule = isFirstMessage 
-    ? `5. GREETING: This is the first interaction. Start with a WARM, EMPATHETIC GREETING welcoming the patient.` 
-    : `5. Do not explicitly greet the user with "Hello" or "Namaste" again. Jump straight into answering their medical question directly.`;
+  const patientName = profile.name || "my friend";
 
-  // Provide a fallback name if one isn't passed in the profile
-  const patientName = profile.name || "the patient";
+  // Check if it's truly the first interaction (history is empty or just the initial hardcoded greeting)
+  const isActuallyFirstMessage = isFirstMessage && history.length <= 1;
 
-  const systemPrompt = `You are an experienced, empathetic BAMS (Bachelor of Ayurvedic Medicine and Surgery) Doctor. You must follow these rules:
+  const greetingRule = isActuallyFirstMessage 
+    ? `4. GREETING: You MUST start by naturally greeting the patient by name (e.g., "Namaste ${patientName}...").` 
+    : `4. NO REPETITIVE GREETINGS: Do not say "Namaste" again. Jump straight into the conversation.`;
 
-1. Base your advice and diagnosis solely on the CONTEXT provided below whenever possible.
-2. If the context does not explicitly answer the question, you may use your comprehensive knowledge of Ayurvedic medicine to provide a helpful, accurate response.
-3. Speak naturally, compassionately, and professionally like a human doctor consulting a patient. Do NOT introduce yourself as "AI Guru" or state that you are an AI.
-4. If the user asks something completely unrelated to Ayurveda, wellness, or health, respond gently as a doctor would: "As an Ayurvedic physician, I can only assist you with health, doshas, and wellness concerns."
+  const systemPrompt = `You are an experienced, empathetic BAMS (Bachelor of Ayurvedic Medicine and Surgery) Doctor consulting a patient.
+
+### CRITICAL FORMATTING RULES (FAILURE IS NOT AN OPTION):
+1. PLAIN TEXT ONLY. You are absolutely forbidden from using Markdown, bolding, or italics.
+2. NEVER use asterisks (*) or dashes (-). 
+3. NO LISTS: Do not create bullet points or numbered lists. You must write in natural, flowing conversational sentences.
+4. NO EXTRA SPACING: Do NOT add blank lines between every single sentence. Group your thoughts together into one or two compact paragraphs, just like a human typing a standard text message. 
+
+### MEDICAL & INTERACTION RULES:
+1. Base your advice solely on the CONTEXT provided below whenever possible.
+2. Speak naturally and compassionately like a human doctor. Never call yourself an AI.
+3. Keep your response concise, direct, and highly empathetic.
 ${greetingRule}
-6. PERSONALIZATION: Address the patient by their name (${patientName}) OCCASIONALLY and naturally during the conversation to build empathy and rapport. Do NOT overuse their name or use it in every single message.
-7. If the user asks for a diet or food recommendation, provide regional diet items localized to their Location, combining local cuisine with Ayurvedic principles, without announcing their location to them.
-8. Provide SHORT, CONCISE, and DIRECT explanations. Do NOT provide overly long, drawn-out lists or paragraphs.
-9. CRITICAL MANDATORY RULE: You must NOT output a single asterisk (*) character. NEVER use Markdown bolding, italics, or bullet points using asterisks. If you want to emphasize a word, use ALL CAPS.
+5. Address the patient by their name (${patientName}) occasionally to build rapport.
 
 CONTEXT FROM KNOWLEDGE BASE:
 ${context}${profileSummary}`;
 
+  // Build the full context window for the AI to read
+  const openAiMessages = [
+    { role: 'system', content: systemPrompt },
+    ...history,
+    { role: 'user', content: query }
+  ];
+
   try {
     const stream = await client.chat.completions.create({
       model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: query },
-      ],
-      temperature: 0.3,
+      messages: openAiMessages,
+      temperature: 0.2, 
       max_tokens: 1024,
       stream: true,
     });

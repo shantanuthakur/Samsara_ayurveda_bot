@@ -6,8 +6,8 @@ const INSUFFICIENT_INFO_RESPONSE = 'Insufficient information in our knowledge ba
 
 export async function chatHandler(req, res, next) {
   try {
-    const { prompt, name, age, gender, height, weight, bmi, dosha, bodyType, location, chronicDisease } = req.body;
-
+    // CHANGE 1: Added 'history = []' to extract the chat history from the frontend request
+    const { prompt, history = [], name, age, gender, height, weight, bmi, dosha, bodyType, location, chronicDisease } = req.body;
 
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
       return res.status(400).json({ error: 'A non-empty "prompt" field is required.' });
@@ -18,11 +18,9 @@ export async function chatHandler(req, res, next) {
 
     const queryVector = await getEmbedding(userQuery);
 
-
     const topK = parseInt(process.env.TOP_K) || 5;
     const results = await searchSimilar(queryVector, topK);
 
-    
     if (!results || results.length === 0) {
       logger.info('No relevant results found — returning insufficient info response', { query: userQuery });
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -30,9 +28,7 @@ export async function chatHandler(req, res, next) {
       return res.end();
     }
 
- 
     const contextChunks = results.map((r, i) => {
- 
       const payload = r.payload || {};
       const text = payload.text || payload.content || payload.chunk || payload.document || JSON.stringify(payload);
       return `[Source ${i + 1} | Relevance: ${(r.score * 100).toFixed(1)}%]\n${text}`;
@@ -45,9 +41,13 @@ export async function chatHandler(req, res, next) {
       contextLength: context.length,
     });
 
-    
     const profile = { name, age, gender, height, weight, bmi, dosha, bodyType, location, chronicDisease };
-    const stream = await generateAnswer(context, userQuery, profile);
+    
+    // CHANGE 2: Determine if this is the first real message based on the history array length
+    const isFirstMessage = history.length <= 1;
+
+    // CHANGE 3: Pass 'isFirstMessage' and 'history' into your generateAnswer function!
+    const stream = await generateAnswer(context, userQuery, profile, isFirstMessage, history);
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 

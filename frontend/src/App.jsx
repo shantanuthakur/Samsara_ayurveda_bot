@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import { User, Send, X, MapPin, UserCircle } from "lucide-react";
 import "./App.css";
 
@@ -28,8 +27,7 @@ function App() {
   const [messages, setMessages] = useState([
     {
       role: "bot",
-      content:
-        "Namaste 🙏 I am your Ayurveda assistant. Please share your concern."
+      content: "Namaste 🙏 I am your Ayurveda assistant. Please share your concern."
     }
   ]);
 
@@ -46,7 +44,6 @@ function App() {
     setMessages((prev) => {
       const newMessages = [...prev];
       if (newMessages.length > 0 && newMessages[0].role === "bot") {
-        const greetingName = profile.name ? ` ${profile.name}` : "";
         newMessages[0] = {
           ...newMessages[0],
           content: `Namaste 🙏 I am your Ayurveda assistant. Please share your concern.`
@@ -64,6 +61,14 @@ function App() {
     if (!input.trim() || loading) return;
 
     const userText = input;
+    
+    // FORMAT HISTORY FOR OPENAI
+    // OpenAI requires roles to be "user" or "assistant"
+    const chatHistory = messages.map(m => ({
+      role: m.role === "bot" ? "assistant" : "user",
+      content: m.content
+    }));
+
     setMessages(prev => [...prev, { role: "user", content: userText }]);
     setInput("");
     setLoading(true);
@@ -76,6 +81,7 @@ function App() {
         },
         body: JSON.stringify({
           prompt: userText,
+          history: chatHistory, // SEND HISTORY TO BACKEND
           ...profile,
           bmi
         }),
@@ -118,9 +124,7 @@ function App() {
 
   return (
     <div className="app">
-      {/* Main Chat Container */}
       <div className="chat-container">
-        {/* HEADER - Light Green */}
         <header className="chat-header">
           <div className="header-left">
             <img src="/monk.png" className="bot-avatar-main" alt="Guru" />
@@ -132,13 +136,11 @@ function App() {
             </div>
           </div>
 
-          {/* User Icon to toggle profile */}
           <button className="user-profile-btn" onClick={() => setSidebarOpen(true)}>
             <UserCircle size={26} />
           </button>
         </header>
 
-        {/* CHAT BODY */}
         <div className="chat-body">
           {messages.map((m, i) => (
             <div key={i} className={`message ${m.role}`}>
@@ -162,7 +164,6 @@ function App() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* INPUT */}
         <div className="chat-input">
           <input
             value={input}
@@ -176,13 +177,11 @@ function App() {
         </div>
       </div>
 
-      {/* Overlay for sidebar */}
       <div
         className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`}
         onClick={() => setSidebarOpen(false)}
       />
 
-      {/* PROFILE SIDEBAR */}
       <div className={`profile-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header">
           <h3>Patient Profile</h3>
