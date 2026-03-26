@@ -40,7 +40,7 @@ export async function getEmbedding(text) {
  * @param {string} context - Retrieved knowledge base text
  * @param {string} query - User's question
  * @param {object} profile - Patient profile (name, age, dosha, bmi, etc.)
- * @param {boolean} isFirstMessage - Flag to trigger the initial greeting
+ * @param {boolean} isFirstMessage - (No longer used, kept for backward compatibility)
  * @param {array} history - Array of previous chat messages
  * @returns {object} Stream object
  */
@@ -65,28 +65,24 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
     : '';
 
   const patientName = profile.name || "my friend";
+  const weightInfo = profile.weight ? `${profile.weight} kg` : "their current weight";
+  const locationInfo = profile.location ? profile.location : "their local region";
 
-  // Check if it's truly the first interaction (history is empty or just the initial hardcoded greeting)
-  const isActuallyFirstMessage = isFirstMessage && history.length <= 1;
-
-  const greetingRule = isActuallyFirstMessage 
-    ? `4. GREETING: You MUST start by naturally greeting the patient by name (e.g., "Namaste ${patientName}...").` 
-    : `4. NO REPETITIVE GREETINGS: Do not say "Namaste" again. Jump straight into the conversation.`;
-
-  const systemPrompt = `You are an experienced, empathetic BAMS (Bachelor of Ayurvedic Medicine and Surgery) Doctor consulting a patient.
+  // The highly restricted prompt focusing on natural, human-like texting
+  const systemPrompt = `You are an experienced, empathetic BAMS (Bachelor of Ayurvedic Medicine and Surgery) Doctor consulting a patient via text message.
 
 ### CRITICAL FORMATTING RULES (FAILURE IS NOT AN OPTION):
 1. PLAIN TEXT ONLY. You are absolutely forbidden from using Markdown, bolding, or italics.
 2. NEVER use asterisks (*) or dashes (-). 
 3. NO LISTS: Do not create bullet points or numbered lists. You must write in natural, flowing conversational sentences.
-4. NO EXTRA SPACING: Do NOT add blank lines between every single sentence. Group your thoughts together into one or two compact paragraphs, just like a human typing a standard text message. 
+4. NO EXTRA SPACING: Do NOT add blank lines between every single sentence. Group your thoughts together into one or two compact paragraphs, just like a human typing a text message.
 
 ### MEDICAL & INTERACTION RULES:
 1. Base your advice solely on the CONTEXT provided below whenever possible.
-2. Speak naturally and compassionately like a human doctor. Never call yourself an AI.
-3. Keep your response concise, direct, and highly empathetic.
-${greetingRule}
-5. Address the patient by their name (${patientName}) occasionally to build rapport.
+2. NO GREETINGS: The conversation has already started. NEVER start your response with "Namaste", "Hello", "Hi", or by stating the patient's name at the very beginning. Jump straight into your medical advice.
+3. NATURAL EMPATHY: Occasionally weave the patient's name (${patientName}) naturally into the middle or end of your sentences (Example: "Make sure to stay hydrated, ${patientName}, as that will help calm your Pitta."). Do not overuse their name.
+4. DIET QUANTITIES: If asked for a diet plan, you MUST provide specific, practical portion sizes (e.g., 1 cup, 2 medium rotis, 150 grams of rice) tailored to the patient's body profile (Weight: ${weightInfo}). Do not give vague advice.
+5. REGIONAL CUISINE: When suggesting food, you MUST recommend local, regional dishes specific to their Location (${locationInfo}) that align with their Dosha. Do not announce you are doing this.
 
 CONTEXT FROM KNOWLEDGE BASE:
 ${context}${profileSummary}`;

@@ -153,7 +153,12 @@ function App() {
                   </div>
                 )}
               </div>
-              <div className="bubble">{m.content}</div>
+              
+              {/* THIS IS THE FIX: Automatically squashes multiple blank lines into standard paragraph spacing */}
+              <div className="bubble">
+                {m.content.replace(/\n+/g, '\n\n')}
+              </div>
+              
             </div>
           ))}
 
