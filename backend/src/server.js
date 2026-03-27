@@ -5,14 +5,14 @@ import logger from './utils/logger.js';
 const PORT = parseInt(process.env.PORT) || 8000;
 
 app.listen(PORT, () => {
-  logger.info(`🚀 RAG Chatbot backend running on port ${PORT}`);
+  logger.info(` RAG Chatbot backend running on port ${PORT}`);
   logger.info(`   Environment : ${process.env.NODE_ENV || 'development'}`);
   logger.info(`   Qdrant      : ${process.env.QDRANT_URL || 'http://localhost:6333'}`);
   logger.info(`   Collection  : ${process.env.QDRANT_COLLECTION || 'ayurveda_core_data'}`);
   logger.info(`   Chat Model  : ${process.env.CHAT_MODEL || 'gpt-4o-mini'}`);
 });
 
-// Graceful shutdown
+
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');
   process.exit(0);

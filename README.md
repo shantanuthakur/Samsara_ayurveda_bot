@@ -1,177 +1,242 @@
-# Ayurveda Chatbot: Full RAG Application
+# Samsara — Ayurveda RAG Chatbot
 
-This repository contains the complete Retrieval-Augmented Generation (RAG) stack for the Ayurveda Chatbot. It provides personalized, context-aware answers solely based on the retrieved knowledge base.
+A full-stack Retrieval-Augmented Generation (RAG) chatbot that provides personalized Ayurvedic health advice. The bot uses vector search to find relevant knowledge from curated databases, then generates natural, doctor-like responses using OpenAI.
 
-## Architecture 
+## Architecture
 
-The application is split into three main components:
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│     Frontend    │────▶│      Backend     │────▶│      Qdrant     │
+│  React + Vite   │     │  Node.js/Express │     │  Vector Database │
+│  Port 5000      │     │  Port 8000       │     │  Port 6333      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                              │
+                              ▼
+                        ┌──────────────┐
+                        │   OpenAI API │
+                        │  Embeddings +│
+                        │  Chat (GPT)  │
+                        └──────────────┘
+```
 
-- **Frontend (`/frontend`)**: A React/Vite web application that collects the user prompt and their health profile (age, dosha, BMI, etc.) and forwards it to the backend.
-- **Backend (`/backend`)**: A Node.js/Express REST server that receives the chat request, converts the text into vector embeddings using OpenAI, searches the Qdrant database for relevant knowledge, and uses an OpenAI ChatCompletion model to synthesize a personalized answer.
-- **Vector Database (`/qdrant_local_db`)**: The Qdrant vector database storage directory. It contains `ayurveda_core_data` (32,126 items) which are searched for context.
+**Frontend** — React/Vite web app with patient profile sidebar (age, dosha, BMI, location).
+**Backend** — Express REST server that handles the RAG pipeline: embed -> search -> generate.
+**Qdrant** — Vector database storing Ayurvedic knowledge embeddings.
+**OpenAI** — Generates text embeddings (`text-embedding-3-small`) and chat responses (`gpt-4o-mini`).
 
 ---
 
-## 🛣️ API Routes
+## Project Structure
 
-The Node.js backend exposes the following REST API endpoints:
+```
+rag_chatbot/
+├── docker-compose.yml          # Qdrant via Docker (cross-platform)
+├── .env.example                # Points to per-directory env files
+├── .gitignore
+├── README.md
+│
+├── backend/
+│   ├── .env.example            # <- Copy to .env, add your OpenAI key
+│   ├── package.json
+│   └── src/
+│       ├── server.js           # Entry point
+│       ├── app.js              # Express app setup
+│       ├── controllers/
+│       ├── middleware/
+│       ├── routes/
+│   ├── scripts/                # Database management
+│   │   ├── seed_qdrant.js      # Seed DB from raw data + OpenAI
+│   │   ├── export_snapshots.js # Export DB as snapshot files
+│   │   └── restore_snapshots.js# Restore DB from snapshots
+│   └── data/                   # Raw data for seeding
+│       ├── samsara_remedies_db.json      
+│       ├── samsara_nutrition.json        
+│       ├── Samsara_india_foods.json      
+│       └── vector_export.jsonl
+│   ├── .env.example            # <- Copy to .env
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│
+├── data/                       # Raw data for seeding
+│   ├── samsara_remedies_db.json      
+│   ├── samsara_nutrition.json        
+│   ├── Samsara_india_foods.json      
+│   └── vector_export.jsonl           
+```
+
+---
+
+## API Routes
 
 ### `POST /api/chat`
-The main chat endpoint. It handles the entire RAG pipeline: embedding, vector search, and LLM text generation. 
-- **Request Body**: JSON object containing `prompt` (string) and optional user profile fields like `name`, `age`, `gender`, `height`, `weight`, `bmi`, `dosha`, `bodyType`, `location`, `chronicDisease`.
-- **Response**: Streams chunks of plain text (the AI's reply) sequentially using the text/plain stream.
+Main chat endpoint — handles the full RAG pipeline.
+
+**Request Body:**
+```json
+{
+  "prompt": "I have acidity problems, what should I eat?",
+  "history": [],
+  "name": "Rahul",
+  "age": 28,
+  "gender": "Male",
+  "height": 175,
+  "weight": 70,
+  "dosha": "Pitta",
+  "location": "Mumbai, Maharashtra"
+}
+```
+
+**Response:** Streams plain text (the AI's response) via chunked transfer encoding.
 
 ### `GET /api/health`
-Health check endpoint used to monitor the status of the backend and its connection to Qdrant.
-- **Response**: `200 OK` (JSON) containing server uptime, status, and database connection state.
+Health check — returns server uptime, Qdrant connection status, and point counts.
+
+### `GET /`
+Root endpoint — returns a simple JSON message confirming the API is running and its version.
 
 ---
 
-## 🚀 Local Development
+## Testing And Deployment
 
-You need to run **three independent processes** in three separate terminal windows:
+### Prerequisites
+- Node.js v18 or later
+- OpenAI API Key
 
-### 1. Start the Qdrant Vector Database
-Terminal 1:
+---
+
+### Step 1: Clone and Configure
+
 ```bash
-cd /Users/shantanuchauhan/Desktop/rag_chatbot
+git clone <your-repo-url>
+cd rag_chatbot
+
+# Set up environment files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# Edit backend/.env and add your OpenAI API key
+nano backend/.env
+```
+
+---
+
+### Step 2: Start Qdrant (Vector Database)
+
+Run the included startup script to launch your local Qdrant instance in the background:
+
+```bash
 ./start_qdrant.sh
 ```
 
-### 2. Start the Backend Server (Port 8000)
-Terminal 2:
+This starts Qdrant on port 6333. Verify it's running:
 ```bash
-cd /Users/shantanuchauhan/Desktop/rag_chatbot/backend
-npm install
-npm run dev
-```
-
-### 3. Start the Frontend App (Port 5000)
-Terminal 3:
-```bash
-cd /Users/shantanuchauhan/Desktop/rag_chatbot/frontend
-npm install
-npm run dev
+curl http://localhost:6333/collections
 ```
 
 ---
 
-## 🌍 Production Server Deployment Guide
+### Step 3: Seed the Database
 
-To deploy this application to a live production server (e.g., Ubuntu VPS on AWS, DigitalOcean, or Hostinger):
+You have two options for setting up the database. Both merge all data into a single 1536-dimensional collection (`ayurveda_core_data`).
 
-### Prerequisites
-- Node.js (v18+) and npm installed on the server.
-- PM2 installed globally: `npm install -g pm2`
-- Nginx installed for reverse proxying and serving the frontend.
-- Your Qdrant vector database properly uploaded to the server or hosted on Qdrant Cloud.
-
-### Step 1: Deploy Qdrant
-If hosting on the same server, you can wrap the Qdrant binary in a systemd service or use Docker mapping your local volume:
+#### Option A: Restore from Snapshots (Fast, Free)
+If you have snapshot files in `backend/data/snapshots/`:
 ```bash
-docker run -d -p 6333:6333 -p 6334:6334 \
-    --name qdrant_db \
-    -v $(pwd)/qdrant_local_db:/qdrant/storage \
-    qdrant/qdrant
+cd backend
+npm install
+npm run restore-snapshots
 ```
 
-### Step 2: Setup the Backend
-1. Clone your project to the server.
-2. Navigate to the backend directory: `cd backend`
-3. Install dependencies: `npm install`
-4. Configure your `.env` file with production variables:
-   ```env
-   PORT=8000
-   OPENAI_API_KEY=your_key_here
-   CORS_ORIGIN=https://yourdomain.com
-   QDRANT_URL=http://localhost:6333
-   ```
-5. Start the backend with PM2 to keep it running in the background:
-   ```bash
-   pm2 start src/server.js --name "rag-backend"
-   pm2 save
-   ```
-
-### Database environment variables (Qdrant credentials)
-
-Use environment variables to configure Qdrant for local, on-prem, or cloud deployment.
-
-Local Qdrant (development):
-```env
-QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION=ayurveda_core_data,ayurveda_books
-SIMILARITY_THRESHOLD=0.35
-```
-
-Qdrant Cloud or remote service (production):
-```env
-QDRANT_URL=https://<your-cluster>.qdrant.cloud:6333
-QDRANT_API_KEY=<qdrant_api_key>
-QDRANT_COLLECTION=ayurveda_core_data,ayurveda_books
-SIMILARITY_THRESHOLD=0.35
-```
-
-In `backend/src/services/qdrantService.js`, ensure the client is built with the API key when provided:
-```js
-client = new QdrantClient({
-    url,
-    apiKey: process.env.QDRANT_API_KEY,
-});
-```
-
-### Step 3: Build the Frontend
-1. Navigate to the frontend directory: `cd frontend`
-2. Update the `VITE_API_URL` inside your `.env` to point to the live domain API:
-   ```env
-   VITE_API_URL=https://api.yourdomain.com/api/chat
-   ```
-3. Install dependencies: `npm install`
-4. Build the static production bundle:
-   ```bash
-   npm run build
-   ```
-   *This generates a `dist/` folder containing the optimized frontend HTML/CSS/JS.*
-
-### Step 4: Configure Nginx
-Configure Nginx to serve your static frontend files and reverse proxy API requests to your Node.js backend. Create a configuration in `/etc/nginx/sites-available/yourdomain.com`:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com api.yourdomain.com;
-
-    # Serve the optimized React Frontend
-    location / {
-        root /path/to/rag_chatbot/frontend/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Reverse Proxy for the Backend API
-    location /api/ {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        
-        # CRITICAL: Disable buffering for streaming responses seamlessly!
-        proxy_buffering off;
-        proxy_read_timeout 300s;
-    }
-}
-```
-Enable the site and restart Nginx:
+#### Option B: Seed from Raw Data (Generates Fresh Embeddings)
+This generates embeddings via OpenAI and inserts them into Qdrant. Costs ~$0.05-0.10 in API usage.
 ```bash
-sudo ln -s /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/
-sudo systemctl restart nginx
+cd backend
+npm install
+npm run seed
+```
+
+The seeder will:
+1. Load all 4 data files (~40,000+ records)
+2. Generate 1536-dimensional embeddings in batches via OpenAI
+3. Upsert vectors into the `ayurveda_core_data` collection
+4. Verify the uploaded points
+
+---
+
+### Step 4: Start the Backend
+
+```bash
+cd backend
+npm run dev      # Development (auto-reload)
+# OR
+npm start        # Production
+```
+
+Backend starts on port 8000. Test the health endpoint:
+```bash
+curl http://localhost:8000/api/health
 ```
 
 ---
 
-## 🛠️ Troubleshooting
+### Step 5: Start the Frontend
 
-- **EADDRINUSE ::8000**: A backend server is already running in the background. Stop it using `kill -9 $(lsof -t -i:8000)`.
-- **Backend fetch failed or Qdrant search failed**: Verify `./start_qdrant.sh` is running and the database is accessible on port `6333`.
-- **"Insufficient information..." response**: The prompt was deemed unrelated to Ayurveda or missed the similarity threshold. Adjust `SIMILARITY_THRESHOLD` inside `/backend/.env`.
+In a new terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend starts on port 5000. Open http://localhost:5000.
+
+---
+
+## Production Deployment (VPS / Cloud)
+
+For production, you can use PM2 and Nginx.
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start backend
+cd backend
+pm2 start src/server.js --name "rag-backend"
+pm2 save
+
+# Build frontend
+cd ../frontend
+npm run build
+```
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+- `OPENAI_API_KEY`: Required. OpenAI API key.
+- `PORT`: Backend server port (default: 8000).
+- `QDRANT_URL`: Qdrant connection URL (default: http://localhost:6333).
+- `QDRANT_API_KEY`: Optional Qdrant Cloud API key.
+- `QDRANT_COLLECTION`: Collection name (default: ayurveda_core_data).
+- `CHAT_MODEL`: OpenAI chat model (default: gpt-4o-mini).
+- `EMBEDDING_MODEL`: OpenAI embedding model (default: text-embedding-3-small).
+- `TOP_K`: Number of vector search results (default: 5).
+- `SIMILARITY_THRESHOLD`: Minimum relevance score (default: 0.35).
+
+### Frontend (`frontend/.env`)
+
+- `VITE_API_URL`: Backend chat API URL (default: http://localhost:8000/api/chat).
+
+---
+
+## Data Sources
+
+- samsara_remedies_db.json: 1,158 condition-to-remedy mappings with dosha associations
+- samsara_nutrition.json: 1,480 food items with nutrition and dosha effects
+- Samsara_india_foods.json: 29,488 regional Indian foods with nutrition and dosha data
+- vector_export.jsonl: 8,700 text chunks from Ayurvedic reference materials

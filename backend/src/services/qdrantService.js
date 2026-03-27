@@ -6,8 +6,11 @@ let client = null;
 function getClient() {
   if (!client) {
     const url = process.env.QDRANT_URL || 'http://localhost:6333';
-    client = new QdrantClient({ url });
-    logger.info(`Qdrant client initialized: ${url}`);
+    const apiKey = process.env.QDRANT_API_KEY || null;
+    const opts = { url, checkCompatibility: false };
+    if (apiKey) opts.apiKey = apiKey;
+    client = new QdrantClient(opts);
+    logger.info(`Qdrant client initialized: ${url}${apiKey ? ' (with API key)' : ''}`);
   }
   return client;
 }

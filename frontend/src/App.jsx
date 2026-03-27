@@ -248,7 +248,7 @@ function App() {
 
           <label><MapPin size={14} /> Location</label>
           <input
-            placeholder="City, Country"
+            placeholder="City, State"
             value={profile.location}
             onChange={e => setProfile({ ...profile, location: e.target.value })}
           />
@@ -273,9 +273,9 @@ function App() {
             onChange={e => setProfile({ ...profile, bodyType: e.target.value })}
           >
             <option value="">Select...</option>
-            <option value="Slim">Slim (Vata)</option>
-            <option value="Medium">Medium (Pitta)</option>
-            <option value="Heavy">Heavy (Kapha)</option>
+            <option value="Slim">Slim(Ectomorph)</option>
+            <option value="Medium">Medium(Mesomorph)</option>
+            <option value="Heavy">Heavy(Endomorph)</option>
           </select>
 
           <label>Chronic History</label>

@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "seed": "node scripts/seed_qdrant.js",
+    "export-snapshots": "node scripts/export_snapshots.js",
+    "restore-snapshots": "node scripts/restore_snapshots.js"
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.12.0",

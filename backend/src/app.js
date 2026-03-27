@@ -10,10 +10,9 @@ import logger from './utils/logger.js';
 
 const app = express();
 
-// ── Security ──
+
 app.use(helmet());
 
-// ── CORS ──
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST'],
@@ -31,19 +30,17 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// ── HTTP request logging ──
 const morganStream = { write: (msg) => logger.http(msg.trim()) };
 app.use(morgan('short', { stream: morganStream }));
 
-// ── Routes ──
 app.use('/api', chatRoutes);
 
-// Root route
+
 app.get('/', (req, res) => {
   res.json({ message: 'RAG Chatbot API is running', version: '1.0.0' });
 });
 
-// ── Global error handler ──
+
 app.use(errorHandler);
 
 export default app;

@@ -68,7 +68,7 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
   const weightInfo = profile.weight ? `${profile.weight} kg` : "their current weight";
   const locationInfo = profile.location ? profile.location : "their local region";
 
-  // The highly restricted prompt focusing on natural, human-like texting
+  
   const systemPrompt = `You are an experienced, empathetic BAMS (Bachelor of Ayurvedic Medicine and Surgery) Doctor consulting a patient via text message.
 
 ### CRITICAL FORMATTING RULES (FAILURE IS NOT AN OPTION):
@@ -87,7 +87,6 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
 CONTEXT FROM KNOWLEDGE BASE:
 ${context}${profileSummary}`;
 
-  // Build the full context window for the AI to read
   const openAiMessages = [
     { role: 'system', content: systemPrompt },
     ...history,
