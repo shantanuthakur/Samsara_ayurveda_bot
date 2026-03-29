@@ -6,7 +6,7 @@ const INSUFFICIENT_INFO_RESPONSE = 'Insufficient information in our knowledge ba
 
 export async function chatHandler(req, res, next) {
   try {
-    // CHANGE 1: Added 'history = []' to extract the chat history from the frontend request
+
     const { prompt, history = [], name, age, gender, height, weight, bmi, dosha, bodyType, location, chronicDisease } = req.body;
 
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
@@ -42,11 +42,10 @@ export async function chatHandler(req, res, next) {
     });
 
     const profile = { name, age, gender, height, weight, bmi, dosha, bodyType, location, chronicDisease };
-    
-    // CHANGE 2: Determine if this is the first real message based on the history array length
+
     const isFirstMessage = history.length <= 1;
 
-    // CHANGE 3: Pass 'isFirstMessage' and 'history' into your generateAnswer function!
+
     const stream = await generateAnswer(context, userQuery, profile, isFirstMessage, history);
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
