@@ -1,0 +1,229 @@
+/* ═══════════════════════════════════════════
+   WelcomeScreen Component — Warm Earthy Theme
+   ═══════════════════════════════════════════ */
+
+.welcome-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8);
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Animated Background ── */
+.welcome-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.welcome-orb {
+    position: absolute;
+    border-radius: var(--radius-full);
+    filter: blur(80px);
+    opacity: 0.12;
+    animation: orb-float 12s ease-in-out infinite;
+}
+
+.welcome-orb-1 {
+    width: 300px;
+    height: 300px;
+    background: var(--color-gold);
+    top: -50px;
+    right: -50px;
+    animation-delay: 0s;
+}
+
+.welcome-orb-2 {
+    width: 250px;
+    height: 250px;
+    background: var(--color-saffron);
+    bottom: -30px;
+    left: -30px;
+    animation-delay: -4s;
+}
+
+.welcome-orb-3 {
+    width: 200px;
+    height: 200px;
+    background: var(--color-orange);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation-delay: -8s;
+}
+
+@keyframes orb-float {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    33% {
+        transform: translate(20px, -30px) scale(1.1);
+    }
+
+    66% {
+        transform: translate(-15px, 20px) scale(0.95);
+    }
+}
+
+/* ── Content ── */
+.welcome-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-8);
+    max-width: 560px;
+    text-align: center;
+    animation: welcome-fade-up 0.8s ease-out;
+}
+
+@keyframes welcome-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.welcome-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: var(--radius-full);
+    border: 3px solid var(--color-gold);
+    object-fit: cover;
+    object-position: center top;
+    background: #fff;
+    padding: 6px;
+    box-shadow: 0 0 30px rgba(176, 120, 50, 0.25);
+    animation: avatar-glow 3s ease-in-out infinite;
+}
+
+@keyframes avatar-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(176, 120, 50, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(176, 120, 50, 0.35);
+    }
+}
+
+.welcome-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.welcome-heading {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.welcome-heading .accent {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.welcome-subtitle {
+    font-size: var(--text-base);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ── Suggestion Cards ── */
+.suggestion-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.suggestion-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--gradient-glass);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-align: left;
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    font-weight: 450;
+}
+
+.suggestion-card:hover {
+    border-color: var(--color-gold);
+    background: rgba(176, 120, 50, 0.06);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-gold);
+}
+
+.suggestion-card:active {
+    transform: translateY(0);
+}
+
+.suggestion-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-input);
+    border-radius: var(--radius-md);
+}
+
+/* ── Om Symbol ── */
+.welcome-om {
+    font-size: 2rem;
+    color: var(--color-gold);
+    opacity: 0.3;
+    margin-top: var(--space-4);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .welcome-screen {
+        padding: var(--space-6);
+    }
+
+    .welcome-heading {
+        font-size: var(--text-2xl);
+    }
+
+    .suggestion-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .welcome-avatar {
+        width: 64px;
+        height: 64px;
+    }
+}
