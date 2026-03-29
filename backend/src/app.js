@@ -42,7 +42,7 @@ app.use('/api', chatRoutes);
 
 
 app.get('/', (req, res) => {
-  res.json({ message: 'RAG Chatbot API is running', version: '1.0.0' });
+  res.json({ message: 'RAG Chatbot API is running successfully!', version: '1.0.0' });
 });
 
 
