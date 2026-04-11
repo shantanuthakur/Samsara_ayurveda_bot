@@ -30,6 +30,8 @@ function App() {
       bodyType: "",
       location: "",
       chronicDisease: "",
+      sleepQuality: "",
+      menstrualCycles: "",
     };
   });
 
@@ -55,15 +57,16 @@ function App() {
     const userText = text || input;
     if (!userText.trim() || loading) return;
 
-    // Validate required fields
-    const requiredFields = ["name", "age", "gender", "height", "weight", "bodyType", "dosha", "location"];
+    // Validate required fields (chronicDisease is optional)
+    const requiredFields = ["name", "age", "gender", "height", "weight", "bodyType", "dosha", "location", "sleepQuality"];
+    if (profile.gender === "Female") requiredFields.push("menstrualCycles");
     const isMissing = requiredFields.some((field) => !profile[field] || profile[field].toString().trim() === "");
 
     if (isMissing) {
       setMessages((prev) => [
         ...prev,
         { role: "user", content: userText },
-        { role: "bot", content: "Please fill out all your information in the Patient Profile before we can begin." }
+        { role: "bot", content: "Please fill all your information in the Patient Profile first." }
       ]);
       setInput("");
       setSidebarOpen(true);

@@ -196,20 +196,89 @@ Frontend starts on port 5000. Open http://localhost:5000.
 
 ## Production Deployment (VPS / Cloud)
 
-For production, you can use PM2 and Nginx.
+For a production deployment to a VPS (e.g. AWS EC2, DigitalOcean, Linode), you will need to run the following components:
+
+1. **Qdrant (Database)**: Running via Docker.
+2. **Node.js Backend**: Running via PM2.
+3. **React Frontend**: Built statically and served via Nginx.
+
+### 1. Database Deployment (Qdrant)
+
+The easiest way to run the vector database in production is using Docker Compose. Make sure Docker is installed on your server.
 
 ```bash
-# Install PM2
+# Start Qdrant in detached mode
+docker compose up -d
+
+# Verify Qdrant is running on port 6333
+curl http://localhost:6333/collections
+```
+
+*Note: Once Qdrant is running, you must either seed the database or restore from snapshots just like in the local setup (see Step 3 above).*
+
+### 2. Backend Deployment (PM2)
+
+Use PM2 to keep the backend running continuously and automatically restart it if it crashes.
+
+```bash
+# Install PM2 globally
 npm install -g pm2
 
-# Start backend
+# Install backend dependencies
 cd backend
-pm2 start src/server.js --name "rag-backend"
-pm2 save
+npm install
 
-# Build frontend
-cd ../frontend
+# Setup your production variables (.env)
+cp .env.example .env
+nano .env  # Add your OPENAI_API_KEY and set NODE_ENV=production
+
+# Start backend via PM2
+pm2 start src/server.js --name "samsara-backend"
+pm2 save       # Save PM2 process list
+pm2 startup    # Configure PM2 to start on server boot
+```
+
+### 3. Frontend Deployment (Nginx)
+
+The frontend should be built into static HTML/CSS/JS and served via a web server like Nginx.
+
+```bash
+# Build the frontend application
+cd frontend
+npm install
 npm run build
+```
+
+This creates a `dist/` directory. You will configure Nginx to serve these files and proxy API requests to your backend (port `8000`).
+
+**Example Nginx Configuration (`/etc/nginx/sites-available/samsara`)**:
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com; # Or your server IP
+
+    # Serve React Frontend
+    location / {
+        root /path/to/rag_chatbot/frontend/dist; # IMPORTANT: Update this path!
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API requests to node Backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+```bash
+# Enable the site and restart Nginx
+sudo ln -s /etc/nginx/sites-available/samsara /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
 ---

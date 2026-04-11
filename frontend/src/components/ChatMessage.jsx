@@ -1,6 +1,7 @@
 import React from "react";
 import { User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./ChatMessage.css";
 
 export function ChatMessage({ role, content }) {
@@ -21,7 +22,7 @@ export function ChatMessage({ role, content }) {
                 <div className="msg-bubble">
                     {isBot ? (
                         <div className="markdown-body">
-                            <ReactMarkdown>{content}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                         </div>
                     ) : (
                         content

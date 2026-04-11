@@ -161,6 +161,43 @@
     margin: var(--space-3) 0;
 }
 
+/* ── Nutrition Table (diet plan) ── */
+.msg-bubble .markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-3) 0;
+    font-size: var(--text-sm);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid rgba(176, 120, 50, 0.2);
+}
+
+.msg-bubble .markdown-body thead th {
+    background: linear-gradient(135deg, rgba(176, 120, 50, 0.12), rgba(142, 96, 40, 0.08));
+    color: #8E6028;
+    font-weight: 600;
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 2px solid rgba(176, 120, 50, 0.2);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.msg-bubble .markdown-body tbody td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid rgba(176, 120, 50, 0.08);
+    color: var(--color-text-primary);
+}
+
+.msg-bubble .markdown-body tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.msg-bubble .markdown-body tbody tr:hover {
+    background: rgba(176, 120, 50, 0.04);
+}
+
 /* ── Typing Indicator ── */
 .typing-dots {
     display: flex;
