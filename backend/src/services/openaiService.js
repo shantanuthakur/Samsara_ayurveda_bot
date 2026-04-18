@@ -1,5 +1,128 @@
 import OpenAI from 'openai';
 import logger from '../utils/logger.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ── Load regional foods from the database JSON file ──
+let cachedFoodsData = null;
+let cachedNutritionData = null;
+
+function getFoodsData() {
+  if (cachedFoodsData) return cachedFoodsData;
+  try {
+    const filePath = path.join(__dirname, '../../data/Samsara_india_foods.json');
+    if (fs.existsSync(filePath)) {
+      cachedFoodsData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      logger.info(`Loaded ${cachedFoodsData.length} food regions from database`);
+    } else {
+      logger.warn('Samsara_india_foods.json not found — using fallback food lists');
+      cachedFoodsData = [];
+    }
+  } catch (err) {
+    logger.error('Failed to load foods database', { error: err.message });
+    cachedFoodsData = [];
+  }
+  return cachedFoodsData;
+}
+
+function getNutritionData() {
+  if (cachedNutritionData) return cachedNutritionData;
+  try {
+    const filePath = path.join(__dirname, '../../data/samsara_nutrition.json');
+    if (fs.existsSync(filePath)) {
+      cachedNutritionData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      logger.info(`Loaded ${cachedNutritionData.length} nutrition entries from database`);
+    } else {
+      logger.warn('samsara_nutrition.json not found');
+      cachedNutritionData = [];
+    }
+  } catch (err) {
+    logger.error('Failed to load nutrition database', { error: err.message });
+    cachedNutritionData = [];
+  }
+  return cachedNutritionData;
+}
+
+function loadNutritionFoods(userDosha) {
+  const data = getNutritionData();
+  if (!data.length) return { good: [], neutral: [] };
+
+  const doshaKey = (userDosha || '').toLowerCase();
+  const good = [];
+  const neutral = [];
+
+  data.forEach(item => {
+    const label = `${item.food} (${item.calories} kcal, P:${item.protein}g, C:${item.carbs}g, F:${item.fat}g)`;
+    if (doshaKey && item.dosha_effect) {
+      const effect = item.dosha_effect[doshaKey];
+      if (effect === 'good') good.push(label);
+      else if (effect === 'neutral') neutral.push(label);
+    } else {
+      neutral.push(label);
+    }
+  });
+
+  return { good, neutral };
+}
+
+function loadFoodsFromDB(userLocation) {
+  const data = getFoodsData();
+  const result = { grains: [], dals: [], fruits: [], vegetables: [], drinks: [], snacks: [], mainDishes: [], sides: [], desserts: [] };
+  if (!data.length || !userLocation) return result;
+
+  const locLower = userLocation.toLowerCase();
+
+  // Find matching regions — match by state name or district/city name
+  const matchedRegions = data.filter(region => {
+    const state = (region.state || '').toLowerCase();
+    const district = (region.district || '').toLowerCase();
+    return locLower.includes(state) || state.includes(locLower) ||
+           locLower.includes(district) || district.includes(locLower);
+  });
+
+  // If no exact match, try partial state match (e.g., "Pune" → "Maharashtra")
+  let regions = matchedRegions;
+  if (regions.length === 0) {
+    // Try to find the state that contains this city in any district
+    const stateMatch = data.find(r => (r.district || '').toLowerCase().includes(locLower));
+    if (stateMatch) {
+      regions = data.filter(r => r.state === stateMatch.state);
+    }
+  }
+
+  if (regions.length === 0) return result;
+
+  // Extract vegetarian foods by category
+  const categoryMap = {
+    'snack': 'snacks', 'main': 'mainDishes', 'side': 'sides', 'side dish': 'sides',
+    'beverage': 'drinks', 'drink': 'drinks', 'dessert': 'desserts', 'desert': 'desserts',
+    'salad': 'sides', 'vegetable': 'vegetables', 'soup': 'drinks', 'condiment': 'sides'
+  };
+
+  const seen = new Set();
+  regions.forEach(region => {
+    (region.foods || []).forEach(food => {
+      if (!food.is_vegetarian) return;
+      const name = food.food_name;
+      if (seen.has(name)) return;
+      seen.add(name);
+
+      const cat = categoryMap[(food.category || '').toLowerCase()] || 'mainDishes';
+      if (result[cat]) {
+        const n = food.nutrition_per_100g || {};
+        const label = n.calories ? `${name} (~${n.calories} kcal/100g)` : name;
+        result[cat].push(label);
+      }
+    });
+  });
+
+  logger.debug(`DB foods for "${userLocation}": ${regions.length} regions, snacks=${result.snacks.length}, mains=${result.mainDishes.length}, drinks=${result.drinks.length}`);
+  return result;
+}
 
 let openaiClient = null;
 
@@ -78,26 +201,49 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
   const currentHour = new Date().getHours();
   const currentMinute = new Date().getMinutes();
 
-  // Randomized food selections to force unique plans
-  const allGrains = ['jowar', 'bajra', 'ragi', 'nachni', 'quinoa', 'amaranth', 'kuttu', 'rajgira', 'makka', 'sama rice', 'brown rice', 'foxtail millet', 'kodo millet', 'little millet', 'barnyard millet'];
-  const allDals = ['moong dal', 'masoor dal', 'chana dal', 'toor dal', 'urad dal', 'kulthi dal', 'horse gram', 'moth dal', 'rajma', 'lobia', 'mixed sprouts'];
-  const allFruits = ['papaya', 'guava', 'pomegranate', 'apple', 'banana', 'orange', 'mango', 'chikoo (sapodilla)', 'pear', 'watermelon', 'muskmelon', 'sweet lime (mosambi)', 'amla (Indian gooseberry)', 'jamun (black plum)', 'sitaphal (custard apple)', 'grapes', 'kiwi', 'plum', 'peach', 'fig (anjeer)', 'dates (khajoor)', 'berries'];
-  const allVegetables = ['lauki (bottle gourd)', 'tori (ridge gourd)', 'karela (bitter gourd)', 'bhindi (okra)', 'gajar (carrot)', 'palak (spinach)', 'methi (fenugreek leaves)', 'baingan (eggplant)', 'gobi (cauliflower)', 'patta gobi (cabbage)', 'shimla mirch (capsicum)', 'kaddu (pumpkin)', 'parwal (pointed gourd)', 'tinda', 'arbi (colocasia)', 'kachalu', 'suran (yam)', 'beetroot', 'broccoli', 'mushroom'];
-  const allEarlyDrinks = ['warm lemon water with honey', 'soaked methi (fenugreek) seed water', 'ajwain (carom) water', 'warm water with turmeric and black pepper', 'amla juice with warm water', 'jeera (cumin) water', 'coriander seed water', 'warm triphala water', 'aloe vera juice with water', 'ginger-tulsi water'];
-  const allBedtimeDrinks = ['warm turmeric milk (haldi doodh)', 'warm ashwagandha milk', 'warm milk with jaiphal (nutmeg)', 'warm milk with gulkand', 'chamomile herbal tea', 'warm milk with saffron (kesar)', 'warm milk with cardamom'];
+  // ── Load food items from DATABASE (Samsara_india_foods.json) ──
+  const dbFoods = loadFoodsFromDB(profile.location || '');
 
-  // Shuffle helper
+  // ── Load nutrition data from DATABASE (samsara_nutrition.json) ──
+  const nutritionFoods = loadNutritionFoods(profile.dosha || '');
+
+  // Fallback base arrays (used when DB has no match)
+  const baseGrains = ['jowar', 'bajra', 'ragi', 'quinoa', 'amaranth', 'brown rice', 'foxtail millet', 'kodo millet', 'little millet', 'barnyard millet', 'oats', 'barley (jau)', 'broken wheat (dalia)', 'red rice', 'sattu flour'];
+  const baseDals = ['moong dal', 'masoor dal', 'chana dal', 'toor dal', 'urad dal', 'kulthi dal', 'rajma', 'lobia', 'mixed sprouts', 'kala chana', 'kabuli chana', 'matki'];
+  const baseFruits = ['papaya', 'guava', 'pomegranate', 'apple', 'banana', 'orange', 'mango', 'chikoo', 'watermelon', 'muskmelon', 'amla', 'jamun', 'sitaphal', 'grapes', 'fig (anjeer)', 'dates', 'pear', 'pineapple', 'coconut', 'bael fruit'];
+  const baseVegetables = ['lauki', 'tori', 'karela', 'bhindi', 'gajar', 'palak', 'methi', 'baingan', 'gobi', 'kaddu', 'parwal', 'arbi', 'beetroot', 'drumstick', 'sweet potato', 'mushroom', 'radish', 'capsicum', 'french beans', 'raw banana'];
+  const baseEarlyDrinks = ['warm lemon water with honey', 'soaked methi seed water', 'ajwain water', 'warm turmeric water', 'amla juice', 'jeera water', 'triphala water', 'ginger-tulsi water'];
+  const baseBedtimeDrinks = ['warm turmeric milk', 'ashwagandha milk', 'warm milk with nutmeg', 'warm milk with gulkand', 'chamomile tea', 'warm milk with saffron', 'warm milk with cardamom'];
+
+  // Merge DB foods into the arrays
+  const allGrains = [...new Set([...baseGrains, ...dbFoods.grains])];
+  const allDals = [...new Set([...baseDals, ...dbFoods.dals])];
+  const allFruits = [...new Set([...baseFruits, ...dbFoods.fruits])];
+  const allVegetables = [...new Set([...baseVegetables, ...dbFoods.vegetables])];
+  const allEarlyDrinks = [...new Set([...baseEarlyDrinks, ...dbFoods.drinks])];
+  const allBedtimeDrinks = [...baseBedtimeDrinks];
+  const allSnacks = dbFoods.snacks;
+
+  // Fisher-Yates shuffle for true randomness
   function pickRandom(arr, count) {
-    const shuffled = [...arr].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a.slice(0, Math.min(count, a.length));
   }
 
-  const todayGrains = pickRandom(allGrains, 4);
-  const todayDals = pickRandom(allDals, 3);
-  const todayFruits = pickRandom(allFruits, 5);
-  const todayVegetables = pickRandom(allVegetables, 5);
+  // Pick random items for this request
+  const todayGrains = pickRandom(allGrains, 5);
+  const todayDals = pickRandom(allDals, 4);
+  const todayFruits = pickRandom(allFruits, 6);
+  const todayVegetables = pickRandom(allVegetables, 6);
   const todayEarlyDrink = pickRandom(allEarlyDrinks, 2);
   const todayBedtimeDrink = pickRandom(allBedtimeDrinks, 1);
+  const todaySnacks = allSnacks.length > 0 ? pickRandom(allSnacks, 4) : [];
+  const todayRegionalDishes = dbFoods.mainDishes.length > 0 ? pickRandom(dbFoods.mainDishes, 5) : [];
+  const todayDoshaFoods = nutritionFoods.good.length > 0 ? pickRandom(nutritionFoods.good, 8) : pickRandom(nutritionFoods.neutral, 8);
 
   // Build dosha-specific diet guidance
   const doshaInfo = profile.dosha ? profile.dosha.toLowerCase() : '';
@@ -129,12 +275,14 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
 ### KNOWLEDGE USE GUIDELINES:
 You are a RAG (Retrieval-Augmented Generation) system. A "CONTEXT FROM KNOWLEDGE BASE" section is provided below with text retrieved from Ayurvedic books (Charaka Samhita, etc.).
 
-1. ALWAYS prioritize the information from the CONTEXT FROM KNOWLEDGE BASE when answering questions about Ayurveda, doshas, herbs, treatments, diseases, and holistic wellness.
+1. You MUST ONLY use the information from the CONTEXT FROM KNOWLEDGE BASE when answering questions about Ayurveda, doshas, herbs, treatments, diseases, and holistic wellness.
 2. If the context contains relevant information, use it to form your answer. You may paraphrase and explain the context in a conversational, patient-friendly manner.
 3. If the context is EMPTY or does NOT contain relevant information for the patient's question:
-   - For general greetings, simple health questions, or conversational messages: respond naturally as a friendly Ayurvedic doctor.
-   - For very specific medical or Ayurvedic questions where you have no context: say "I don't have specific information about this in my knowledge base right now, but here is what I can share from general Ayurvedic principles..." and provide a brief, helpful response.
-4. NEVER refuse to answer a genuine health or Ayurveda question. Always try to be helpful.
+   - For general greetings or casual conversation (like "hello", "thank you", "how are you"): respond naturally as a friendly Ayurvedic doctor.
+   - For diet plan requests: generate a personalized diet plan using the patient profile and food selections provided below.
+   - For ALL other questions (health, Ayurvedic, medical, or any topic): you MUST simply say "I don't have information about this topic in our database. Please ask me about Ayurvedic wellness, doshas, diet plans, or lifestyle that I have been trained on." Do NOT answer from your own training data. Do NOT provide any information that is not in the CONTEXT FROM KNOWLEDGE BASE.
+4. NEVER use your general AI training knowledge to answer specific questions. The CONTEXT FROM KNOWLEDGE BASE is your ONLY source of truth. If it's not there, say so and stop.
+5. TOPIC RESTRICTION: You are ONLY an Ayurvedic doctor. You must ONLY answer questions related to Ayurveda, health, wellness, doshas, diet, herbs, lifestyle, yoga, meditation, and holistic healing. If the patient asks something completely unrelated to health or Ayurveda (like math, science, coding, politics, general knowledge, etc.), politely say: "I am your Ayurveda wellness assistant. I can only help you with Ayurveda, health, diet, and wellness-related questions. Please feel free to ask me anything about your health!" Do NOT answer non-health questions.
 
 ### TWO FORMATTING MODES — CHOOSE BASED ON THE QUESTION:
 
@@ -246,7 +394,7 @@ You MUST use these SPECIFIC items in today's plan. These are RANDOMLY selected f
 - FRUITS to include today: ${todayFruits.join(', ')}. Use at LEAST 3 of these by name in Mid-Morning, Evening Snack, or with meals. Write the full name every time.
 - VEGETABLES to use today: ${todayVegetables.join(', ')}. Use at LEAST 3 of these in Lunch and Dinner sabzi/curries.
 - EARLY MORNING DRINK today: ${todayEarlyDrink.join(' OR ')}.
-- BEDTIME DRINK today: ${todayBedtimeDrink[0]}.
+- BEDTIME DRINK today: ${todayBedtimeDrink[0]}.${todaySnacks.length > 0 ? `\n- REGIONAL SNACKS from database: ${todaySnacks.join(', ')}. Use 2-3 of these in Breakfast or Evening Snack.` : ''}${todayRegionalDishes.length > 0 ? `\n- REGIONAL MAIN DISHES from database: ${todayRegionalDishes.join(', ')}. Use 2-3 of these in Lunch or Dinner.` : ''}${todayDoshaFoods.length > 0 ? `\n- DOSHA-FAVORABLE FOODS from nutrition database (with real calorie data): ${todayDoshaFoods.join('; ')}. Prefer these items where possible — they are best suited for this patient's dosha. Use the calorie values provided to calculate the Total Daily Nutrition Summary accurately.` : ''}
 
 ##### DOSHA-SPECIFIC GUIDANCE:
 ${doshaGuidance || 'No specific dosha provided. Use a tridosha-balancing approach.'}
