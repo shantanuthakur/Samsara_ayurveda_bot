@@ -57,6 +57,52 @@ export async function searchSimilar(queryVector, topK = 5) {
   }
 }
 
+/**
+ * Search Qdrant with per-type filtering (nutrition, remedy, regional_food, book_chunk)
+ * Uses a lower threshold to catch more relevant results from specific data types
+ */
+export async function searchByTypes(queryVector, types = [], topK = 5) {
+  const collectionsParam = process.env.QDRANT_COLLECTION || 'ayurveda_core_data';
+  const collections = collectionsParam.split(',').map(c => c.trim());
+  const lowerThreshold = 0.2; // Lower threshold for supplementary search
+
+  try {
+    const qdrant = getClient();
+
+    const filter = {
+      should: types.map(type => ({
+        key: 'type',
+        match: { value: type }
+      }))
+    };
+
+    const searchPromises = collections.map(collection =>
+      qdrant.search(collection, {
+        vector: queryVector,
+        limit: topK,
+        with_payload: true,
+        score_threshold: lowerThreshold,
+        filter: filter,
+      }).catch(err => {
+        logger.error(`Qdrant filtered search failed for ${collection}`, { error: err.message });
+        return [];
+      })
+    );
+
+    const resultsArray = await Promise.all(searchPromises);
+    const combinedResults = resultsArray
+      .flat()
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK);
+
+    logger.debug(`Qdrant filtered search (types: ${types.join(',')}) returned ${combinedResults.length} results.`);
+    return combinedResults;
+  } catch (error) {
+    logger.error('Qdrant filtered search failed', { error: error.message });
+    return [];
+  }
+}
+
 export async function healthCheck() {
   try {
     const qdrant = getClient();

@@ -1,5 +1,5 @@
 import { getEmbedding, generateAnswer } from '../services/openaiService.js';
-import { searchSimilar } from '../services/qdrantService.js';
+import { searchSimilar, searchByTypes } from '../services/qdrantService.js';
 import logger from '../utils/logger.js';
 
 // Diet/meal plan keywords — used to detect if profile is required server-side
@@ -62,9 +62,14 @@ export async function chatHandler(req, res, next) {
     // Get embedding and search knowledge base
     const queryVector = await getEmbedding(userQuery);
     const topK = parseInt(process.env.TOP_K) || 5;
-    const results = await searchSimilar(queryVector, topK);
 
-    // Build context from search results (may be empty — that's OK)
+    // Run main search + supplementary filtered search in parallel
+    const [results, supplementaryResults] = await Promise.all([
+      searchSimilar(queryVector, topK),
+      searchByTypes(queryVector, ['nutrition', 'remedy', 'regional_food', 'book_chunk'], 5)
+    ]);
+
+    // Build context from main search results
     let context = '';
     let topScore = 0;
     if (results && results.length > 0) {
@@ -77,10 +82,32 @@ export async function chatHandler(req, res, next) {
       context = contextChunks.join('\n\n---\n\n');
     }
 
+    // Append supplementary results (from filtered Qdrant search with lower threshold)
+    if (supplementaryResults && supplementaryResults.length > 0) {
+      // Avoid duplicates — only add results not already in main results
+      const mainIds = new Set((results || []).map(r => r.id));
+      const extraChunks = supplementaryResults
+        .filter(r => !mainIds.has(r.id))
+        .map((r, i) => {
+          const payload = r.payload || {};
+          const text = payload.text || payload.content || payload.chunk || payload.document || JSON.stringify(payload);
+          const typeLabel = payload.type ? `[${payload.type}]` : '';
+          return `[Supplementary ${typeLabel} | Relevance: ${(r.score * 100).toFixed(1)}%]\n${text}`;
+        });
+
+      if (extraChunks.length > 0) {
+        context = context
+          ? `${context}\n\n---\n\n${extraChunks.join('\n\n---\n\n')}`
+          : extraChunks.join('\n\n---\n\n');
+      }
+    }
+
     logger.debug('Context built from results', {
-      numResults: results?.length || 0,
+      mainResults: results?.length || 0,
+      supplementaryResults: supplementaryResults?.length || 0,
       topScore,
       contextLength: context.length,
+      contextPreview: context.substring(0, 200),
     });
 
     const profile = {
