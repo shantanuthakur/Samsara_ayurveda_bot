@@ -8,6 +8,30 @@ import "./App.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/chat";
 
+// Detect if the user is asking for a diet/meal plan or food recommendation
+const DIET_KEYWORDS = [
+  "diet plan", "meal plan", "food chart", "food plan", "calorie plan",
+  "weight loss diet", "weight gain diet", "what should i eat",
+  "daily diet", "eating plan", "nutrition plan", "diet chart",
+  "breakfast lunch dinner", "khana", "aahaar", "bhojan",
+  "suggest food", "suggest diet", "recommend diet", "recommend food",
+  "meal chart", "food schedule", "diet schedule", "kya khana chahiye",
+  "diet food", "food recommendation", "diet item", "diet recommendation",
+  "what to eat", "what can i eat", "what i eat", "food suggestion",
+  "food for me", "best food", "healthy food", "healthy diet",
+  "weight loss food", "weight gain food", "food advice", "eating advice",
+  "my diet", "my food", "my meal", "give me diet", "give me food",
+  "give me meal", "create diet", "create meal", "make diet", "make meal",
+  "plan my diet", "plan my meal", "diet for me", "meal for me",
+  "food for weight", "food for health", "diet tips", "food tips",
+  "kya khaye", "kya khau", "khana batao", "diet batao",
+];
+
+function isDietPlanQuery(text) {
+  const lower = text.toLowerCase();
+  return DIET_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -57,20 +81,22 @@ function App() {
     const userText = text || input;
     if (!userText.trim() || loading) return;
 
-    // Validate required fields (chronicDisease is optional)
-    const requiredFields = ["name", "age", "gender", "height", "weight", "bodyType", "dosha", "location", "sleepQuality"];
-    if (profile.gender === "Female") requiredFields.push("menstrualCycles");
-    const isMissing = requiredFields.some((field) => !profile[field] || profile[field].toString().trim() === "");
+    // Only validate profile for diet/meal plan queries
+    if (isDietPlanQuery(userText)) {
+      const requiredFields = ["name", "age", "gender", "height", "weight", "bodyType", "dosha", "location", "sleepQuality"];
+      if (profile.gender === "Female") requiredFields.push("menstrualCycles");
+      const isMissing = requiredFields.some((field) => !profile[field] || profile[field].toString().trim() === "");
 
-    if (isMissing) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: userText },
-        { role: "bot", content: "Please fill all your information in the Patient Profile first." }
-      ]);
-      setInput("");
-      setSidebarOpen(true);
-      return;
+      if (isMissing) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: userText },
+          { role: "bot", content: "To create a personalized diet plan, I need your complete profile information. Please fill in your details in the Patient Profile sidebar." }
+        ]);
+        setInput("");
+        setSidebarOpen(true);
+        return;
+      }
     }
 
     // Format history for OpenAI (roles: "user" | "assistant")

@@ -2,10 +2,29 @@ import { getEmbedding, generateAnswer } from '../services/openaiService.js';
 import { searchSimilar } from '../services/qdrantService.js';
 import logger from '../utils/logger.js';
 
-// Minimum relevance score — results below this are treated as "not found"
-const MIN_RELEVANCE_SCORE = parseFloat(process.env.SIMILARITY_THRESHOLD) || 0.65;
+// Diet/meal plan keywords — used to detect if profile is required server-side
+const DIET_KEYWORDS = [
+  'diet plan', 'meal plan', 'food chart', 'food plan', 'calorie plan',
+  'weight loss diet', 'weight gain diet', 'what should i eat',
+  'daily diet', 'eating plan', 'nutrition plan', 'diet chart',
+  'breakfast lunch dinner', 'khana', 'aahaar', 'bhojan',
+  'suggest food', 'suggest diet', 'recommend diet', 'recommend food',
+  'meal chart', 'food schedule', 'diet schedule', 'kya khana chahiye',
+  'diet food', 'food recommendation', 'diet item', 'diet recommendation',
+  'what to eat', 'what can i eat', 'what i eat', 'food suggestion',
+  'food for me', 'best food', 'healthy food', 'healthy diet',
+  'weight loss food', 'weight gain food', 'food advice', 'eating advice',
+  'my diet', 'my food', 'my meal', 'give me diet', 'give me food',
+  'give me meal', 'create diet', 'create meal', 'make diet', 'make meal',
+  'plan my diet', 'plan my meal', 'diet for me', 'meal for me',
+  'food for weight', 'food for health', 'diet tips', 'food tips',
+  'kya khaye', 'kya khau', 'khana batao', 'diet batao',
+];
 
-const NO_DB_DATA_RESPONSE = "I'm sorry, I don't have information about this in my Ayurvedic knowledge base. Please ask me about Ayurveda, doshas, herbs, lifestyle, or holistic wellness.";
+function isDietPlanQuery(text) {
+  const lower = text.toLowerCase();
+  return DIET_KEYWORDS.some(kw => lower.includes(kw));
+}
 
 export async function chatHandler(req, res, next) {
   try {
@@ -23,39 +42,43 @@ export async function chatHandler(req, res, next) {
     }
 
     const userQuery = prompt.trim();
-    logger.info('Chat request received', { queryLength: userQuery.length });
+    const isDiet = isDietPlanQuery(userQuery);
+    logger.info('Chat request received', { queryLength: userQuery.length, isDietQuery: isDiet });
 
+    // Server-side check: diet plan requires complete profile
+    if (isDiet) {
+      const requiredFields = { name, age, gender, height, weight, dosha, bodyType, location, sleepQuality };
+      const missing = Object.entries(requiredFields)
+        .filter(([, v]) => !v || v.toString().trim() === '')
+        .map(([k]) => k);
+      if (missing.length > 0) {
+        logger.info('Diet plan requested but profile incomplete', { missing });
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.write('To create a personalized diet plan, I need your complete profile information. Please fill in your details in the Patient Profile sidebar.');
+        return res.end();
+      }
+    }
+
+    // Get embedding and search knowledge base
     const queryVector = await getEmbedding(userQuery);
-
     const topK = parseInt(process.env.TOP_K) || 5;
     const results = await searchSimilar(queryVector, topK);
 
-    // Gate 1: No results at all
-    if (!results || results.length === 0) {
-      logger.info('No results from DB — sending "no data" response', { query: userQuery });
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.write(NO_DB_DATA_RESPONSE);
-      return res.end();
+    // Build context from search results (may be empty — that's OK)
+    let context = '';
+    let topScore = 0;
+    if (results && results.length > 0) {
+      topScore = results[0]?.score ?? 0;
+      const contextChunks = results.map((r, i) => {
+        const payload = r.payload || {};
+        const text = payload.text || payload.content || payload.chunk || payload.document || JSON.stringify(payload);
+        return `[Source ${i + 1} | Relevance: ${(r.score * 100).toFixed(1)}%]\n${text}`;
+      });
+      context = contextChunks.join('\n\n---\n\n');
     }
-
-    // Gate 2: Best match score is below the minimum relevance threshold
-    const topScore = results[0]?.score ?? 0;
-    if (topScore < MIN_RELEVANCE_SCORE) {
-      logger.info('Top result score too low — sending "no data" response', { topScore, query: userQuery });
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.write(NO_DB_DATA_RESPONSE);
-      return res.end();
-    }
-
-    const contextChunks = results.map((r, i) => {
-      const payload = r.payload || {};
-      const text = payload.text || payload.content || payload.chunk || payload.document || JSON.stringify(payload);
-      return `[Source ${i + 1} | Relevance: ${(r.score * 100).toFixed(1)}%]\n${text}`;
-    });
-    const context = contextChunks.join('\n\n---\n\n');
 
     logger.debug('Context built from results', {
-      numResults: results.length,
+      numResults: results?.length || 0,
       topScore,
       contextLength: context.length,
     });
@@ -68,7 +91,7 @@ export async function chatHandler(req, res, next) {
 
     const isFirstMessage = history.length <= 1;
 
-    const stream = await generateAnswer(context, userQuery, profile, isFirstMessage, history);
+    const stream = await generateAnswer(context, userQuery, profile, isFirstMessage, history, isDiet);
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 

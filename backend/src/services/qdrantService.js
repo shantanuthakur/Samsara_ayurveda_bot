@@ -24,7 +24,7 @@ function getClient() {
 export async function searchSimilar(queryVector, topK = 5) {
   const collectionsParam = process.env.QDRANT_COLLECTION || 'ayurveda_core_data';
   const collections = collectionsParam.split(',').map(c => c.trim());
-  const threshold = parseFloat(process.env.SIMILARITY_THRESHOLD) || 0.65;
+  const threshold = parseFloat(process.env.SIMILARITY_THRESHOLD) || 0.35;
 
   try {
     const qdrant = getClient();
