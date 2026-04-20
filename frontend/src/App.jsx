@@ -25,6 +25,9 @@ const DIET_KEYWORDS = [
   "plan my diet", "plan my meal", "diet for me", "meal for me",
   "food for weight", "food for health", "diet tips", "food tips",
   "kya khaye", "kya khau", "khana batao", "diet batao",
+  "gym diet", "gym food", "gym meal", "workout diet", "workout food",
+  "fitness diet", "fitness food", "muscle diet", "protein diet",
+  "bodybuilding diet", "exercise diet", "training diet",
 ];
 
 function isDietPlanQuery(text) {
@@ -91,7 +94,7 @@ function App() {
         setMessages((prev) => [
           ...prev,
           { role: "user", content: userText },
-          { role: "bot", content: "To create a personalized diet plan, I need your complete profile information. Please fill in your details in the Patient Profile sidebar." }
+          { role: "bot", content: "📋 **Profile Incomplete**\n\nTo create a personalized diet plan, I need your complete profile information.\n\n**Please fill in your details:**\n- 👤 **Name**, **Age**, **Gender**\n- 📏 **Height** & **Weight**\n- 🧬 **Body Type** & **Dosha**\n- 📍 **Location**\n- 😴 **Sleep Quality**\n\nOpen the **Patient Profile** sidebar ➡️ to fill in your details, then ask me again! 🙏" }
         ]);
         setInput("");
         setSidebarOpen(true);
@@ -100,10 +103,13 @@ function App() {
     }
 
     // Format history for OpenAI (roles: "user" | "assistant")
-    const chatHistory = messages.map((m) => ({
+    // Limit to last 20 messages (10 exchanges) to prevent context overflow
+    // which causes the model to ignore system prompt rules in long conversations
+    const allHistory = messages.map((m) => ({
       role: m.role === "bot" ? "assistant" : "user",
       content: m.content,
     }));
+    const chatHistory = allHistory.slice(-20);
 
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     setInput("");
@@ -149,7 +155,7 @@ function App() {
         ...prev,
         {
           role: "bot",
-          content: "I'm unable to connect right now. Please check that the backend server is running and try again.",
+          content: "⚠️ **Connection Error**\n\nI'm unable to connect to the server right now.\n\n**Please check:**\n- 🖥️ The backend server is running (`npm run dev`)\n- 🌐 Your internet connection is active\n- 🔄 Try refreshing the page\n\nIf the issue persists, please restart the backend server and try again. 🙏",
         },
       ]);
     } finally {

@@ -2,6 +2,26 @@ import { getEmbedding, generateAnswer } from '../services/openaiService.js';
 import { searchSimilar, searchByTypes } from '../services/qdrantService.js';
 import logger from '../utils/logger.js';
 
+// Common misspelling corrections for Ayurveda-related terms
+const SPELL_CORRECTIONS = [
+  [/\b(a+r[ue]+r?v?e?d+a?|a+y?u?r[uv]?e?d+a?|aay?u?rv?e?d+a?|aaruerveda|aruerveda|aurveda|ayurvda|aryuveda|ayurvedia|ayurved)\b/gi, 'ayurveda'],
+  [/\b(nuration|nutration|nutrtion|nutriton|nurtition)\b/gi, 'nutrition'],
+  [/\b(patato|potao|ptato)\b/gi, 'potato'],
+  [/\b(pumpin|pumpkn|pumkin)\b/gi, 'pumpkin'],
+  [/\b(vatta|vaata|vat[ah])\b/gi, 'vata'],
+  [/\b(piita|pita|pittah)\b/gi, 'pitta'],
+  [/\b(kaph|kapah|kaffa)\b/gi, 'kapha'],
+  [/\b(dosh[ah]?s?)\b/gi, match => match.toLowerCase().startsWith('dosha') ? match : 'dosha'],
+];
+
+function correctSpelling(text) {
+  let corrected = text;
+  for (const [pattern, replacement] of SPELL_CORRECTIONS) {
+    corrected = corrected.replace(pattern, replacement);
+  }
+  return corrected;
+}
+
 // Diet/meal plan keywords — used to detect if profile is required server-side
 const DIET_KEYWORDS = [
   'diet plan', 'meal plan', 'food chart', 'food plan', 'calorie plan',
@@ -19,6 +39,9 @@ const DIET_KEYWORDS = [
   'plan my diet', 'plan my meal', 'diet for me', 'meal for me',
   'food for weight', 'food for health', 'diet tips', 'food tips',
   'kya khaye', 'kya khau', 'khana batao', 'diet batao',
+  'gym diet', 'gym food', 'gym meal', 'workout diet', 'workout food',
+  'fitness diet', 'fitness food', 'muscle diet', 'protein diet',
+  'bodybuilding diet', 'exercise diet', 'training diet',
 ];
 
 function isDietPlanQuery(text) {
@@ -41,8 +64,12 @@ export async function chatHandler(req, res, next) {
       return res.status(400).json({ error: 'A non-empty "prompt" field is required.' });
     }
 
-    const userQuery = prompt.trim();
+    const rawQuery = prompt.trim();
+    const userQuery = correctSpelling(rawQuery);
     const isDiet = isDietPlanQuery(userQuery);
+    if (rawQuery !== userQuery) {
+      logger.info('Spell-corrected query', { original: rawQuery, corrected: userQuery });
+    }
     logger.info('Chat request received', { queryLength: userQuery.length, isDietQuery: isDiet });
 
     // Server-side check: diet plan requires complete profile
@@ -54,7 +81,7 @@ export async function chatHandler(req, res, next) {
       if (missing.length > 0) {
         logger.info('Diet plan requested but profile incomplete', { missing });
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.write('To create a personalized diet plan, I need your complete profile information. Please fill in your details in the Patient Profile sidebar.');
+        res.write('📋 **Profile Incomplete**\n\nTo create a personalized diet plan, I need your complete profile information.\n\n**Please fill in your details:**\n- 👤 **Name**, **Age**, **Gender**\n- 📏 **Height** & **Weight**\n- 🧬 **Body Type** & **Dosha**\n- 📍 **Location**\n- 😴 **Sleep Quality**\n\nOpen the **Patient Profile** sidebar ➡️ to fill in your details, then ask me again! 🙏');
         return res.end();
       }
     }
