@@ -103,13 +103,13 @@ function App() {
     }
 
     // Format history for OpenAI (roles: "user" | "assistant")
-    // Limit to last 20 messages (10 exchanges) to prevent context overflow
+    // Limit to last 6 messages (3 exchanges) to prevent context overflow
     // which causes the model to ignore system prompt rules in long conversations
     const allHistory = messages.map((m) => ({
       role: m.role === "bot" ? "assistant" : "user",
       content: m.content,
     }));
-    const chatHistory = allHistory.slice(-20);
+    const chatHistory = allHistory.slice(-6);
 
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     setInput("");
