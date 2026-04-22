@@ -189,7 +189,7 @@ export async function generateAnswer(context, query, profile = {}, isFirstMessag
 
   const profileSummary = profileParts.length > 0
     ? `\n\nPatient Profile:\n${profileParts.join('\n')}`
-    : '';
+    : '\n\nPatient Profile: Not yet provided. Proceed without it — answer all questions normally.';
 
   const patientName = profile.name || 'my friend';
   const weightInfo = profile.weight ? `${profile.weight} kg` : 'their current weight';
@@ -503,6 +503,7 @@ Use rich, well-structured formatting to make your answers easy to read and visua
 2. USE PATIENT'S NAME: Address the patient by their name (${patientName}) at least 2 to 3 times naturally throughout your response. Example: "${patientName}, for your body type I would suggest..."
 3. STRICTLY VEGETARIAN: All food recommendations MUST be 100% pure vegetarian. NEVER suggest meat, chicken, mutton, fish, seafood, eggs, or any non-vegetarian item. Use only dal, moong, chana, paneer, curd, milk, nuts, seeds, and legumes. This rule is absolute.
 4. SLEEP & CYCLES AWARENESS: If the patient has Light sleep, factor in Vata-pacifying recommendations. If they have noted menstrual cycle irregularity, incorporate relevant Ayurvedic support from the context only.
+5. NEVER ASK FOR PROFILE: You must NEVER ask the patient to fill in their profile, provide their details, share their age/weight/dosha, or complete any form. NEVER say things like "please provide your details", "I need your information first", "fill your profile", or "tell me your age/weight/dosha before I can help". If the patient profile is empty or incomplete, simply answer their question with general Ayurvedic advice. The ONLY exception is diet plan requests — but that validation is handled by the application, NOT by you. Your job is to ALWAYS answer the question directly, regardless of whether profile data exists.
 
 CONTEXT FROM KNOWLEDGE BASE:
 ${context || '(No specific context retrieved for this query)'}${profileSummary}`;
