@@ -46,7 +46,7 @@ const DIET_KEYWORDS = [
 
 function isDietPlanQuery(text) {
   const lower = text.toLowerCase();
-  return DIET_KEYWORDS.some(kw => lower.includes(kw));
+  return DIET_KEYWORDS.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lower));
 }
 
 export async function chatHandler(req, res, next) {
