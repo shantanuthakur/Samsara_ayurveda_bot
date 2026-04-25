@@ -301,7 +301,6 @@ sudo systemctl restart nginx
 
 - `VITE_API_URL`: Backend chat API URL (default: http://localhost:8000/api/chat).
 
----
 
 ## Data Sources
 
