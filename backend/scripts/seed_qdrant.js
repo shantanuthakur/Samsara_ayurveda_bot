@@ -16,6 +16,7 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { fileURLToPath } from 'url';
 
 // paths
@@ -136,6 +137,133 @@ function loadVectorExport() {
       };
     })
     .filter(Boolean);
+}
+
+function loadHerbs() {
+  const filePath = path.join(DATA_DIR, 'Herbs.json');
+  if (!fs.existsSync(filePath)) return [];
+  const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  console.log(`  loaded ${raw.length} herbs`);
+
+  return raw.map((herb, idx) => {
+    // Build other names string
+    const otherNames = [];
+    if (herb.other_names) {
+      if (herb.other_names.hindi && herb.other_names.hindi.length)
+        otherNames.push(`Hindi: ${herb.other_names.hindi.join(', ')}`);
+      if (herb.other_names.english && herb.other_names.english.length)
+        otherNames.push(`English: ${herb.other_names.english.join(', ')}`);
+      if (herb.other_names.sanskrit && herb.other_names.sanskrit.length)
+        otherNames.push(`Sanskrit: ${herb.other_names.sanskrit.join(', ')}`);
+    }
+
+    // Build properties string
+    const props = herb.properties || {};
+    const propParts = [];
+    if (props.rasa && props.rasa.length) propParts.push(`Rasa: ${props.rasa.join(', ')}`);
+    if (props.virya) propParts.push(`Virya: ${props.virya}`);
+    if (props.vipaka) propParts.push(`Vipaka: ${props.vipaka}`);
+    if (props.guna && props.guna.length) propParts.push(`Guna: ${props.guna.join(', ')}`);
+
+    // Build dosha effect
+    const dosha = herb.dosha_effect || {};
+    const doshaParts = [];
+    if (dosha.vata) doshaParts.push(`Vata: ${dosha.vata}`);
+    if (dosha.pitta) doshaParts.push(`Pitta: ${dosha.pitta}`);
+    if (dosha.kapha) doshaParts.push(`Kapha: ${dosha.kapha}`);
+
+    // Build uses
+    const uses = herb.uses || {};
+    const benefits = (uses.benefits || []).join(', ');
+    const symptoms = (uses.symptoms_targeted || []).map(s => s.symptom).join(', ');
+    const diseases = (uses.diseases_targeted || []).map(d => d.disease).join(', ');
+
+    // Build contraindications
+    const contras = (herb.contraindications || []).map(c => `${c.condition}: ${c.reason}`).join('; ');
+
+    // Build dosage
+    const dosage = herb.dosage || {};
+    const dosageParts = [];
+    if (dosage.amount) dosageParts.push(dosage.amount);
+    if (dosage.vehicle) dosageParts.push(`with ${dosage.vehicle}`);
+    if (dosage.frequency) dosageParts.push(dosage.frequency);
+
+    // Build precautions
+    const precautions = (herb.precautions || []).join('; ');
+
+    // Compose full text chunk
+    const textParts = [
+      `Herb: ${herb.name}${herb.botanical_name ? ` (${herb.botanical_name})` : ''}`,
+    ];
+    if (otherNames.length) textParts.push(`Also known as: ${otherNames.join(' | ')}`);
+    if (propParts.length) textParts.push(`Properties: ${propParts.join(' | ')}`);
+    if (doshaParts.length) textParts.push(`Dosha Effect: ${doshaParts.join(', ')}`);
+    if (benefits) textParts.push(`Benefits: ${benefits}`);
+    if (symptoms) textParts.push(`Symptoms targeted: ${symptoms}`);
+    if (diseases) textParts.push(`Diseases targeted: ${diseases}`);
+    if (contras) textParts.push(`Contraindications: ${contras}`);
+    if (dosageParts.length) textParts.push(`Dosage: ${dosageParts.join(', ')}`);
+    if (precautions) textParts.push(`Precautions: ${precautions}`);
+    if (herb.tags && herb.tags.length) textParts.push(`Tags: ${herb.tags.join(', ')}`);
+
+    return {
+      id: `herb_${idx}`,
+      text: textParts.join('\n'),
+      metadata: {
+        source: 'herbs_db',
+        type: 'herb',
+        name: herb.name,
+        botanical_name: herb.botanical_name || '',
+        tags: (herb.tags || []).join(','),
+      }
+    };
+  });
+}
+
+/**
+ * Loads Books_data.jsonl using streaming readline (memory-efficient for 2.7GB).
+ * Each line has { source, text, chunk_index, embedding } with pre-computed 1536-dim vectors.
+ * Returns an array of { text, metadata, embedding }.
+ */
+async function loadBooksData() {
+  const filePath = path.join(DATA_DIR, 'Books_data.jsonl');
+  if (!fs.existsSync(filePath)) return [];
+
+  console.log(`  streaming Books_data.jsonl (this may take a moment for 2.7GB)...`);
+
+  const chunks = [];
+  const rl = readline.createInterface({
+    input: fs.createReadStream(filePath, { encoding: 'utf-8' }),
+    crlfDelay: Infinity,
+  });
+
+  let idx = 0;
+  let skipped = 0;
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    try {
+      const item = JSON.parse(line);
+      if (!item.text || item.text.trim().length < 20 || !item.embedding || !Array.isArray(item.embedding)) {
+        skipped++;
+        continue;
+      }
+      chunks.push({
+        text: item.text,
+        metadata: {
+          source: item.source || 'books_data',
+          type: 'book_data',
+          chunk_index: item.chunk_index || idx,
+        },
+        embedding: item.embedding,
+      });
+      idx++;
+    } catch (e) {
+      skipped++;
+    }
+  }
+
+  console.log(`  loaded ${chunks.length} book chunks with pre-computed embeddings (skipped ${skipped})`);
+  return chunks;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,15 +390,26 @@ async function main() {
   const nutrition  = loadNutrition();
   const indiaFoods = loadIndiaFoods();
   const bookChunks = loadVectorExport();
+  const herbs      = loadHerbs();
+  const booksData  = await loadBooksData();
 
-  const allChunks = [...remedies, ...nutrition, ...indiaFoods, ...bookChunks];
-  console.log(`\n  total chunks to seed: ${allChunks.length}`);
-  console.log(`    remedies:       ${remedies.length}`);
-  console.log(`    nutrition:      ${nutrition.length}`);
-  console.log(`    regional foods: ${indiaFoods.length}`);
-  console.log(`    book chunks:    ${bookChunks.length}\n`);
+  // Chunks that need fresh embeddings from OpenAI
+  const chunksNeedingEmbeddings = [...remedies, ...nutrition, ...indiaFoods, ...bookChunks, ...herbs];
+  // Chunks with pre-computed embeddings (Books_data.jsonl)
+  const preEmbeddedChunks = booksData;
 
-  if (allChunks.length === 0) {
+  const totalChunks = chunksNeedingEmbeddings.length + preEmbeddedChunks.length;
+  console.log(`\n  total chunks to seed: ${totalChunks}`);
+  console.log(`    remedies:             ${remedies.length}`);
+  console.log(`    nutrition:            ${nutrition.length}`);
+  console.log(`    regional foods:       ${indiaFoods.length}`);
+  console.log(`    book chunks (legacy): ${bookChunks.length}`);
+  console.log(`    herbs:                ${herbs.length}`);
+  console.log(`    books data (pre-emb): ${preEmbeddedChunks.length}`);
+  console.log(`\n  needing OpenAI embeddings: ${chunksNeedingEmbeddings.length}`);
+  console.log(`  pre-computed embeddings:   ${preEmbeddedChunks.length}\n`);
+
+  if (totalChunks === 0) {
     console.error('  no data found. make sure the data/ directory has the JSON files.');
     process.exit(1);
   }
@@ -283,18 +422,45 @@ async function main() {
     return;
   }
 
-  // step 4 – generate embeddings
-  console.log(`\n[4] generating embeddings (${EMBEDDING_MODEL})...`);
-  console.log(`  this will make ~${Math.ceil(allChunks.length / BATCH_SIZE)} API calls to OpenAI\n`);
-
   const t0 = Date.now();
-  const embeddings = await embedInBatches(allChunks);
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`\n  embedding took ${elapsed}s\n`);
 
-  // step 5 – upsert
-  console.log('[5] upserting vectors into qdrant...');
-  await upsertVectors(COLLECTION_NAME, allChunks, embeddings);
+  // step 4 – generate embeddings for chunks that need them
+  if (chunksNeedingEmbeddings.length > 0) {
+    console.log(`\n[4] generating embeddings for ${chunksNeedingEmbeddings.length} chunks (${EMBEDDING_MODEL})...`);
+    console.log(`  this will make ~${Math.ceil(chunksNeedingEmbeddings.length / BATCH_SIZE)} API calls to OpenAI\n`);
+
+    const embeddings = await embedInBatches(chunksNeedingEmbeddings);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(`\n  embedding took ${elapsed}s\n`);
+
+    // step 5a – upsert freshly-embedded chunks
+    console.log('[5a] upserting freshly-embedded vectors into qdrant...');
+    await upsertVectors(COLLECTION_NAME, chunksNeedingEmbeddings, embeddings);
+  } else {
+    console.log('\n[4] no chunks need fresh embeddings, skipping OpenAI calls.\n');
+  }
+
+  // step 5b – upsert pre-embedded book chunks (no OpenAI needed)
+  if (preEmbeddedChunks.length > 0) {
+    console.log(`\n[5b] upserting ${preEmbeddedChunks.length} pre-embedded book vectors into qdrant...`);
+    const preEmbedOffset = chunksNeedingEmbeddings.length; // offset IDs so they don't collide
+    const preTotal = Math.ceil(preEmbeddedChunks.length / UPSERT_BATCH);
+
+    for (let i = 0; i < preEmbeddedChunks.length; i += UPSERT_BATCH) {
+      const num   = Math.floor(i / UPSERT_BATCH) + 1;
+      const batch = preEmbeddedChunks.slice(i, i + UPSERT_BATCH);
+
+      const points = batch.map((chunk, j) => ({
+        id: preEmbedOffset + i + j,
+        vector: chunk.embedding,
+        payload: { text: chunk.text, ...chunk.metadata },
+      }));
+
+      process.stdout.write(`  upserting pre-embedded batch ${num}/${preTotal}...`);
+      await qdrant.upsert(COLLECTION_NAME, { points });
+      console.log(' done');
+    }
+  }
 
   // step 6 – verify
   console.log('\n[6] verifying...');

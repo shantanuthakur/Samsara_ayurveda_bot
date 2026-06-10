@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 // ── Load regional foods from the database JSON file ──
 let cachedFoodsData = null;
 let cachedNutritionData = null;
+let cachedHerbsData = null;
 
 function getFoodsData() {
   if (cachedFoodsData) return cachedFoodsData;
@@ -45,6 +46,122 @@ function getNutritionData() {
     cachedNutritionData = [];
   }
   return cachedNutritionData;
+}
+
+function getHerbsData() {
+  if (cachedHerbsData) return cachedHerbsData;
+  try {
+    const filePath = path.join(__dirname, '../../data/Herbs.json');
+    if (fs.existsSync(filePath)) {
+      cachedHerbsData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      logger.info(`Loaded ${cachedHerbsData.length} herbs from database`);
+    } else {
+      logger.warn('Herbs.json not found');
+      cachedHerbsData = [];
+    }
+  } catch (err) {
+    logger.error('Failed to load herbs database', { error: err.message });
+    cachedHerbsData = [];
+  }
+  return cachedHerbsData;
+}
+
+/**
+ * Find herbs matching keywords in the query by name, botanical name, or alternate names.
+ * Returns formatted text snippets for up to 3 matching herbs.
+ */
+function findMatchingHerbs(query) {
+  const herbs = getHerbsData();
+  if (!herbs.length) return '';
+
+  const queryLower = query.toLowerCase();
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+
+  const matches = herbs.filter(herb => {
+    // Match by primary name
+    if (herb.name && queryLower.includes(herb.name.toLowerCase())) return true;
+    // Match by botanical name
+    if (herb.botanical_name && queryLower.includes(herb.botanical_name.toLowerCase())) return true;
+    // Match by alternate names
+    if (herb.other_names) {
+      const allNames = [
+        ...(herb.other_names.hindi || []),
+        ...(herb.other_names.english || []),
+        ...(herb.other_names.sanskrit || []),
+      ];
+      if (allNames.some(n => queryLower.includes(n.toLowerCase()))) return true;
+    }
+    return false;
+  });
+
+  if (matches.length === 0) return '';
+
+  // Format top 3 matches into context text
+  return matches.slice(0, 3).map(herb => {
+    const parts = [`Herb: ${herb.name}${herb.botanical_name ? ` (${herb.botanical_name})` : ''}`];
+
+    // Other names
+    const names = [];
+    if (herb.other_names) {
+      if (herb.other_names.hindi?.length) names.push(`Hindi: ${herb.other_names.hindi.join(', ')}`);
+      if (herb.other_names.english?.length) names.push(`English: ${herb.other_names.english.join(', ')}`);
+      if (herb.other_names.sanskrit?.length) names.push(`Sanskrit: ${herb.other_names.sanskrit.join(', ')}`);
+    }
+    if (names.length) parts.push(`Also known as: ${names.join(' | ')}`);
+
+    // Properties
+    const props = herb.properties || {};
+    const propParts = [];
+    if (props.rasa?.length) propParts.push(`Rasa: ${props.rasa.join(', ')}`);
+    if (props.virya) propParts.push(`Virya: ${props.virya}`);
+    if (props.vipaka) propParts.push(`Vipaka: ${props.vipaka}`);
+    if (props.guna?.length) propParts.push(`Guna: ${props.guna.join(', ')}`);
+    if (propParts.length) parts.push(`Properties: ${propParts.join(' | ')}`);
+
+    // Dosha effect
+    const dosha = herb.dosha_effect || {};
+    const doshaParts = [];
+    if (dosha.vata) doshaParts.push(`Vata: ${dosha.vata}`);
+    if (dosha.pitta) doshaParts.push(`Pitta: ${dosha.pitta}`);
+    if (dosha.kapha) doshaParts.push(`Kapha: ${dosha.kapha}`);
+    if (doshaParts.length) parts.push(`Dosha Effect: ${doshaParts.join(', ')}`);
+
+    // Benefits & uses
+    const uses = herb.uses || {};
+    if (uses.benefits?.length) parts.push(`Benefits: ${uses.benefits.join(', ')}`);
+    if (uses.symptoms_targeted?.length) {
+      parts.push(`Symptoms targeted:\n${uses.symptoms_targeted.map(s => `  - ${s.symptom}: ${s.why}`).join('\n')}`);
+    }
+    if (uses.diseases_targeted?.length) {
+      parts.push(`Diseases targeted:\n${uses.diseases_targeted.map(d => `  - ${d.disease}: ${d.why}`).join('\n')}`);
+    }
+
+    // Contraindications
+    if (herb.contraindications?.length) {
+      parts.push(`Contraindications:\n${herb.contraindications.map(c => `  - ${c.condition}: ${c.reason}`).join('\n')}`);
+    }
+
+    // Interactions
+    if (herb.interactions) {
+      const inter = herb.interactions;
+      if (inter.avoid_with?.length) parts.push(`Avoid with: ${inter.avoid_with.join(', ')}`);
+      if (inter.pregnancy) parts.push(`Pregnancy: ${inter.pregnancy}`);
+      if (inter.children) parts.push(`Children: ${inter.children}`);
+    }
+
+    // Dosage
+    const dosage = herb.dosage || {};
+    const dosageParts = [];
+    if (dosage.amount) dosageParts.push(dosage.amount);
+    if (dosage.vehicle) dosageParts.push(`with ${dosage.vehicle}`);
+    if (dosage.frequency) dosageParts.push(dosage.frequency);
+    if (dosageParts.length) parts.push(`Dosage: ${dosageParts.join(', ')}`);
+
+    // Precautions
+    if (herb.precautions?.length) parts.push(`Precautions: ${herb.precautions.join('; ')}`);
+
+    return parts.join('\n');
+  }).join('\n\n---\n\n');
 }
 
 function loadNutritionFoods(userDosha) {
@@ -278,6 +395,8 @@ You are a RAG (Retrieval-Augmented Generation) system. A "CONTEXT FROM KNOWLEDGE
 - **Ayurvedic remedies** (conditions, dosha-specific remedies)
 - **Regional food data** (Indian regional foods with nutrition info)
 - **Ayurvedic book chapters** (Charaka Samhita, etc.)
+- **Herb data** (herb name, botanical name, properties, dosha effects, benefits, symptoms/diseases targeted, contraindications, dosage, precautions)
+- **Ayurvedic books data** (comprehensive book passages with detailed Ayurvedic knowledge)
 
 **PRIORITY RULES — follow in this exact order:**
 
@@ -303,7 +422,13 @@ Feel free to ask me anything about your health! 🙏
    - If you find the food in the context (under ANY format), extract the calories, protein, carbs, fat, vitamins, and dosha effect and present them clearly with rich formatting.
    - If the context does NOT contain data for that specific food → you MAY provide general nutritional information from your knowledge, but add a formatted note: "*(📝 Note: This is general nutritional information. For dosha-specific effects, please consult your Ayurvedic practitioner.)*"
 
-4. **REMEDY/TREATMENT QUERIES:** If the patient asks about remedies or treatments:
+4. **HERB QUERIES:** If the patient asks about a specific herb, spice, or medicinal plant (e.g., Ashwagandha, Tulsi, Triphala, Ginger, Neem, Guduchi, etc.):
+   - If the context contains herb data → present it comprehensively with rich formatting: name, botanical name, alternate names, Ayurvedic properties (rasa, virya, vipaka, guna), dosha effects, benefits, symptoms targeted, diseases targeted, contraindications, dosage, and precautions.
+   - Structure the response with clear sections using headings and emojis (🌿, 🔬, ⚖️, 💊, ⚠️).
+   - ALWAYS include contraindications and safety precautions when available — this is safety-critical.
+   - If the herb is NOT found in context → you may provide general information but add: "*(📝 Note: This is general information. Consult an Ayurvedic practitioner for personalized guidance.)*"
+
+5. **REMEDY/TREATMENT QUERIES:** If the patient asks about remedies or treatments:
    - If the context contains remedy data → use it with rich formatting.
    - If NO remedy data in context → respond with this formatted message:
 
@@ -318,13 +443,13 @@ I don't have specific remedy data for this condition in our database at the mome
 
 Do NOT suggest specific remedies from training data — this is safety-critical.
 
-5. **GENERAL AYURVEDA KNOWLEDGE:** For educational questions about Ayurveda itself — such as "What is Ayurveda?", "How old is Ayurveda?", "What are doshas?", "What is Panchakarma?", "Explain Vata/Pitta/Kapha", history and principles of Ayurveda, etc. — you MUST answer these with rich formatting. If the context has relevant book content, use it. If not, you MAY answer from your general knowledge since these are well-established educational facts. NEVER refuse to answer a question about Ayurveda basics.
+6. **GENERAL AYURVEDA KNOWLEDGE:** For educational questions about Ayurveda itself — such as "What is Ayurveda?", "How old is Ayurveda?", "What are doshas?", "What is Panchakarma?", "Explain Vata/Pitta/Kapha", history and principles of Ayurveda, etc. — you MUST answer these with rich formatting. If the context has relevant book content, use it. If not, you MAY answer from your general knowledge since these are well-established educational facts. NEVER refuse to answer a question about Ayurveda basics.
 
-6. **GREETINGS & CASUAL CHAT:** For greetings or casual conversation ("hello", "thank you", "how are you"): respond naturally as a friendly Ayurvedic doctor with warm formatting.
+7. **GREETINGS & CASUAL CHAT:** For greetings or casual conversation ("hello", "thank you", "how are you"): respond naturally as a friendly Ayurvedic doctor with warm formatting.
 
-7. **DIET PLAN REQUESTS:** For diet plan requests (including gym diet, weight loss diet, weight gain diet, fitness diet): generate a personalized Ayurvedic diet plan using the patient profile and food selections below. A "gym diet plan" is a valid request — provide an Ayurvedic approach to fitness nutrition.
+8. **DIET PLAN REQUESTS:** For diet plan requests (including gym diet, weight loss diet, weight gain diet, fitness diet): generate a personalized Ayurvedic diet plan using the patient profile and food selections below. A "gym diet plan" is a valid request — provide an Ayurvedic approach to fitness nutrition.
 
-8. **FALLBACK:** For health-related questions where the context has NO relevant data AND none of rules 3-7 apply, respond with this formatted message:
+9. **FALLBACK:** For health-related questions where the context has NO relevant data AND none of rules 3-7 apply, respond with this formatted message:
 
 **I'm sorry, but I don't have information about this topic in our database.**
 
@@ -508,14 +633,33 @@ Use rich, well-structured formatting to make your answers easy to read and visua
 CONTEXT FROM KNOWLEDGE BASE:
 ${context || '(No specific context retrieved for this query)'}${profileSummary}`;
 
+  // Enrich context with direct herb matches (keyword-based, supplements vector search)
+  const herbContext = findMatchingHerbs(query);
+  if (herbContext) {
+    const enrichedContext = context
+      ? `${context}\n\n---\n\n[Direct Herb Database Match]\n${herbContext}`
+      : `[Direct Herb Database Match]\n${herbContext}`;
+    // Replace context in the system prompt
+    const contextPlaceholder = context || '(No specific context retrieved for this query)';
+    const systemPromptWithHerbs = systemPrompt.replace(
+      `CONTEXT FROM KNOWLEDGE BASE:\n${contextPlaceholder}`,
+      `CONTEXT FROM KNOWLEDGE BASE:\n${enrichedContext}`
+    );
+    // Use enriched system prompt
+    var finalSystemPrompt = systemPromptWithHerbs;
+  } else {
+    var finalSystemPrompt = systemPrompt;
+  }
+
   // Build a short reminder to reinforce critical rules in long conversations
   const reminder = `REMINDER: You are an Ayurvedic doctor. Follow Priority Rules strictly:
 - Rule 3: For nutrition queries, use BOTH "Food:" AND "Regional Food:" entries from the context.
-- Rule 5: For general Ayurveda knowledge questions (what is Ayurveda, doshas, history, etc.), you MUST answer them — NEVER refuse. Use book content from context if available, or your general knowledge.
+- Rule 4: For herb queries, use the herb data from context — include properties, dosha effects, benefits, contraindications, and dosage.
+- Rule 6: For general Ayurveda knowledge questions (what is Ayurveda, doshas, history, etc.), you MUST answer them — NEVER refuse. Use book content from context if available, or your general knowledge.
 - NEVER say "I don't have information" for basic Ayurveda educational questions.`;
 
   const openAiMessages = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: finalSystemPrompt },
     ...history,
     { role: 'system', content: reminder },
     { role: 'user', content: query },

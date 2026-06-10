@@ -93,7 +93,7 @@ export async function chatHandler(req, res, next) {
     // Run main search + supplementary filtered search in parallel
     const [results, supplementaryResults] = await Promise.all([
       searchSimilar(queryVector, topK),
-      searchByTypes(queryVector, ['nutrition', 'remedy', 'regional_food', 'book_chunk'], 5)
+      searchByTypes(queryVector, ['nutrition', 'remedy', 'regional_food', 'book_chunk', 'herb', 'book_data'], 5)
     ]);
 
     // Build context from main search results
