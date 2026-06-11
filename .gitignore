@@ -39,6 +39,9 @@ qdrant
 # ── Data Snapshots (large binary files) ─────────────────────
 data/snapshots/
 
+# ── Large Data Files (hosted externally, see README) ────────
+backend/data/Books_data.jsonl
+
 # ── Coverage / Testing ──────────────────────────────────────
 coverage/
 .nyc_output/

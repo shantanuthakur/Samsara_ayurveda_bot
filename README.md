@@ -52,7 +52,9 @@ rag_chatbot/
 │       ├── samsara_remedies_db.json      
 │       ├── samsara_nutrition.json        
 │       ├── Samsara_india_foods.json      
-│       └── vector_export.jsonl
+│       ├── Herbs.json                    
+│       ├── vector_export.jsonl
+│       └── Books_data.jsonl   # ⚠️ 2.6 GB — NOT in Git, see below
 │   ├── .env.example            # <- Copy to .env
 │   ├── index.html
 │   ├── package.json
@@ -95,6 +97,22 @@ Health check — returns server uptime, Qdrant connection status, and point coun
 
 ### `GET /`
 Root endpoint — returns a simple JSON message confirming the API is running and its version.
+
+---
+
+## ⚠️ Large Data File — Books_data.jsonl
+
+The file `backend/data/Books_data.jsonl` (~2.6 GB) contains **86,000+ book chunks with pre-computed 1536-dim embeddings**. It is **too large for GitHub** and is excluded via `.gitignore`.
+
+### How to Get It
+
+Download the file and place it at `backend/data/Books_data.jsonl` before running the seed script.
+
+| Method | Link |
+|--------|------|
+| Google Drive | *https://drive.google.com/drive/folders/1ib0f25-lEckM8-6dkzMvE3SVw2u3Dx6_?usp=sharing* |
+
+> **Note:** Without this file, the seed script will still work — it will simply skip the book data and seed only the herbs, remedies, nutrition, and regional foods. The chatbot will still function but with a smaller knowledge base.
 
 ---
 
@@ -304,7 +322,11 @@ sudo systemctl restart nginx
 
 ## Data Sources
 
-- samsara_remedies_db.json: 1,158 condition-to-remedy mappings with dosha associations
-- samsara_nutrition.json: 1,480 food items with nutrition and dosha effects
-- Samsara_india_foods.json: 29,488 regional Indian foods with nutrition and dosha data
-- vector_export.jsonl: 8,700 text chunks from Ayurvedic reference materials
+| File | Records | Description |
+|------|---------|-------------|
+| `samsara_remedies_db.json` | 1,158 | Condition-to-remedy mappings with dosha associations |
+| `samsara_nutrition.json` | 1,480 | Food items with nutrition and dosha effects |
+| `Samsara_india_foods.json` | 29,488 | Regional Indian foods with nutrition and dosha data |
+| `vector_export.jsonl` | 8,700 | Text chunks from Ayurvedic reference materials |
+| `Herbs.json` | 300+ | Ayurvedic herbs with properties, uses, and dosage |
+| `Books_data.jsonl` ⚠️ | 86,000+ | Book chunks with pre-computed embeddings (2.6 GB, not in Git) |

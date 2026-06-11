@@ -1,2 +1,2 @@
-backend/data/Books_data.jsonl filter=lfs diff=lfs merge=lfs -text
+# Custom git attributes
 backend/data/New_books.jsonl filter=lfs diff=lfs merge=lfs -text
