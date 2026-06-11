@@ -110,7 +110,7 @@ Download the file and place it at `backend/data/Books_data.jsonl` before running
 
 | Method | Link |
 |--------|------|
-| Google Drive | *https://drive.google.com/drive/folders/1ib0f25-lEckM8-6dkzMvE3SVw2u3Dx6_?usp=sharing* |
+| Google Drive | *[https://drive.google.com/drive/folders/1ib0f25-lEckM8-6dkzMvE3SVw2u3Dx6_?usp=sharing](https://drive.google.com/drive/folders/15KZdJR9Hn4w_Uc1wt6jf9bdkfyNR1F0X?usp=sharing)* |
 
 > **Note:** Without this file, the seed script will still work — it will simply skip the book data and seed only the herbs, remedies, nutrition, and regional foods. The chatbot will still function but with a smaller knowledge base.
 
