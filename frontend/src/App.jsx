@@ -46,7 +46,7 @@ function App() {
     try {
       const saved = localStorage.getItem("samsara_profile");
       if (saved) return JSON.parse(saved);
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     return {
       name: "",
       age: "",

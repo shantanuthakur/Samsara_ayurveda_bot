@@ -35,8 +35,11 @@ export default function ProfileSidebar({ open, onClose, profile, onProfileChange
     // Clear missing fields when sidebar closes
     useEffect(() => {
         if (!open) {
-            setMissingFields([]);
-            setErrorMsg("");
+            const handle = setTimeout(() => {
+                setMissingFields([]);
+                setErrorMsg("");
+            }, 0);
+            return () => clearTimeout(handle);
         }
     }, [open]);
 
@@ -184,8 +187,10 @@ export default function ProfileSidebar({ open, onClose, profile, onProfileChange
                                         onClick={() => update("sleepQuality", s.value)}
                                     >
                                         <span className="sleep-emoji">{s.emoji}</span>
-                                        <span className="sleep-value">{s.value}</span>
-                                        <span className="sleep-desc">{s.desc}</span>
+                                        <div className="sleep-text-content">
+                                            <span className="sleep-value">{s.value}</span>
+                                            <span className="sleep-desc">{s.desc}</span>
+                                        </div>
                                     </button>
                                 ))}
                             </div>
@@ -302,6 +307,9 @@ export default function ProfileSidebar({ open, onClose, profile, onProfileChange
                         </div>
                     </div>
 
+                </div>
+
+                <div className="sidebar-footer">
                     {/* Error Message */}
                     {errorMsg && (
                         <div className="validation-error">
