@@ -87,15 +87,15 @@ function App() {
     });
   }, []);
 
-  // Auto-scroll when finalized messages change
+  // Scroll to bottom only when user sends a new message
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "user") {
+        scrollToBottom();
+      }
+    }
   }, [messages, scrollToBottom]);
-
-  // Auto-scroll during streaming
-  useEffect(() => {
-    if (streamingContent) scrollToBottom();
-  }, [streamingContent, scrollToBottom]);
 
   const sendMessage = async (text) => {
     const userText = text || input;
