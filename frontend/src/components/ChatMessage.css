@@ -252,3 +252,28 @@
     .msg-bubble { max-width: 88%; }
     .msg-avatar { width: 30px; height: 30px; }
 }
+
+/* ── Streaming Message (no animation re-trigger, lightweight text) ── */
+.message-row.streaming-message {
+    animation: none;
+}
+
+.streaming-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.streaming-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: #B07832;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: cursor-blink 0.8s ease-in-out infinite;
+}
+
+@keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}

@@ -54,7 +54,7 @@ rag_chatbot/
 │       ├── Samsara_india_foods.json      
 │       ├── Herbs.json                    
 │       ├── vector_export.jsonl
-│       └── Books_data.jsonl   # ⚠️ 2.6 GB — NOT in Git, see below
+│       └── New_books.jsonl
 │   ├── .env.example            # <- Copy to .env
 │   ├── index.html
 │   ├── package.json
@@ -98,23 +98,7 @@ Health check — returns server uptime, Qdrant connection status, and point coun
 ### `GET /`
 Root endpoint — returns a simple JSON message confirming the API is running and its version.
 
----
-
-## ⚠️ Large Data File — Books_data.jsonl
-
-The file `backend/data/Books_data.jsonl` (~2.6 GB) contains **86,000+ book chunks with pre-computed 1536-dim embeddings**. It is **too large for GitHub** and is excluded via `.gitignore`.
-
-### How to Get It
-
-Download the file and place it at `backend/data/Books_data.jsonl` before running the seed script.
-
-| Method | Link |
-|--------|------|
-| Google Drive | *[https://drive.google.com/drive/folders/1ib0f25-lEckM8-6dkzMvE3SVw2u3Dx6_?usp=sharing](https://drive.google.com/drive/folders/15KZdJR9Hn4w_Uc1wt6jf9bdkfyNR1F0X?usp=sharing)* |
-
-> **Note:** Without this file, the seed script will still work — it will simply skip the book data and seed only the herbs, remedies, nutrition, and regional foods. The chatbot will still function but with a smaller knowledge base.
-
----
+--
 
 ## Testing And Deployment
 

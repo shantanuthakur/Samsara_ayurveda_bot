@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatHeader from "./components/ChatHeader";
-import { ChatMessage, TypingIndicator } from "./components/ChatMessage";
+import { ChatMessage, StreamingMessage, TypingIndicator } from "./components/ChatMessage";
 import ChatInput from "./components/ChatInput";
 import ProfileSidebar from "./components/ProfileSidebar";
 import WelcomeScreen from "./components/WelcomeScreen";
@@ -64,6 +64,9 @@ function App() {
 
   const [bmi, setBmi] = useState("");
   const chatEndRef = useRef(null);
+  const streamBufferRef = useRef("");
+  const rafIdRef = useRef(null);
+  const scrollRafRef = useRef(null);
 
   // Calculate BMI
   useEffect(() => {
@@ -75,10 +78,24 @@ function App() {
     }
   }, [profile.height, profile.weight]);
 
-  // Auto-scroll to bottom
+  // Smooth scroll — throttled to avoid layout thrashing on mobile
+  const scrollToBottom = useCallback(() => {
+    if (scrollRafRef.current) return; // already scheduled
+    scrollRafRef.current = requestAnimationFrame(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: "auto" });
+      scrollRafRef.current = null;
+    });
+  }, []);
+
+  // Auto-scroll when finalized messages change
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Auto-scroll during streaming
+  useEffect(() => {
+    if (streamingContent) scrollToBottom();
+  }, [streamingContent, scrollToBottom]);
 
   const sendMessage = async (text) => {
     const userText = text || input;
@@ -134,19 +151,35 @@ function App() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
-      let accumulated = "";
+      streamBufferRef.current = "";
+
+      // Flush buffer to state at ~60fps using rAF
+      const scheduleFlush = () => {
+        if (rafIdRef.current) return;
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          setStreamingContent(streamBufferRef.current);
+        });
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        accumulated += chunk;
-        setStreamingContent(accumulated);
+        streamBufferRef.current += chunk;
+        scheduleFlush();
       }
 
+      // Final flush to ensure all content is rendered
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      const finalContent = streamBufferRef.current;
+
       // Streaming done — commit the full message and clear streaming state
-      setMessages((prev) => [...prev, { role: "bot", content: accumulated }]);
+      setMessages((prev) => [...prev, { role: "bot", content: finalContent }]);
       setStreamingContent("");
     } catch (err) {
       console.error("Chat Error:", err);
@@ -181,7 +214,7 @@ function App() {
               ))}
               {loading && streamingContent === "" && <TypingIndicator />}
               {streamingContent !== "" && (
-                <ChatMessage role="bot" content={streamingContent} />
+                <StreamingMessage content={streamingContent} />
               )}
               <div ref={chatEndRef} />
             </div>

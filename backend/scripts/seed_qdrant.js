@@ -220,16 +220,12 @@ function loadHerbs() {
   });
 }
 
-/**
- * Loads Books_data.jsonl using streaming readline (memory-efficient for 2.7GB).
- * Each line has { source, text, chunk_index, embedding } with pre-computed 1536-dim vectors.
- * Returns an array of { text, metadata, embedding }.
- */
-async function loadBooksData() {
-  const filePath = path.join(DATA_DIR, 'Books_data.jsonl');
+
+async function loadNewBooks() {
+  const filePath = path.join(DATA_DIR, 'New_books.jsonl');
   if (!fs.existsSync(filePath)) return [];
 
-  console.log(`  streaming Books_data.jsonl (this may take a moment for 2.7GB)...`);
+  console.log(`  streaming New_books.jsonl...`);
 
   const chunks = [];
   const rl = readline.createInterface({
@@ -250,7 +246,7 @@ async function loadBooksData() {
       chunks.push({
         text: item.text,
         metadata: {
-          source: item.source || 'books_data',
+          source: item.source || 'new_books',
           type: 'book_data',
           chunk_index: item.chunk_index || idx,
         },
@@ -391,12 +387,12 @@ async function main() {
   const indiaFoods = loadIndiaFoods();
   const bookChunks = loadVectorExport();
   const herbs      = loadHerbs();
-  const booksData  = await loadBooksData();
+  const newBooks   = await loadNewBooks();
 
   // Chunks that need fresh embeddings from OpenAI
   const chunksNeedingEmbeddings = [...remedies, ...nutrition, ...indiaFoods, ...bookChunks, ...herbs];
-  // Chunks with pre-computed embeddings (Books_data.jsonl)
-  const preEmbeddedChunks = booksData;
+  // Chunks with pre-computed embeddings (New_books.jsonl)
+  const preEmbeddedChunks = newBooks;
 
   const totalChunks = chunksNeedingEmbeddings.length + preEmbeddedChunks.length;
   console.log(`\n  total chunks to seed: ${totalChunks}`);
@@ -405,7 +401,7 @@ async function main() {
   console.log(`    regional foods:       ${indiaFoods.length}`);
   console.log(`    book chunks (legacy): ${bookChunks.length}`);
   console.log(`    herbs:                ${herbs.length}`);
-  console.log(`    books data (pre-emb): ${preEmbeddedChunks.length}`);
+  console.log(`    new books (pre-emb):  ${newBooks.length}`);
   console.log(`\n  needing OpenAI embeddings: ${chunksNeedingEmbeddings.length}`);
   console.log(`  pre-computed embeddings:   ${preEmbeddedChunks.length}\n`);
 
