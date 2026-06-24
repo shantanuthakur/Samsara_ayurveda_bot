@@ -80,13 +80,13 @@ Main chat endpoint — handles the full RAG pipeline.
 {
   "prompt": "I have acidity problems, what should I eat?",
   "history": [],
-  "name": "Rahul",
+  "name": "Shantanu",
   "age": 28,
   "gender": "Male",
   "height": 175,
   "weight": 70,
   "dosha": "Pitta",
-  "location": "Mumbai, Maharashtra"
+  "location": "Roorkee, Uttrakhand"
 }
 ```
 
