@@ -41,6 +41,7 @@ data/snapshots/
 
 # ── Large Data Files (hosted externally, see README) ────────
 backend/data/Books_data.jsonl
+backend/data/Real_Books_data.jsonl
 
 # ── Coverage / Testing ──────────────────────────────────────
 coverage/
